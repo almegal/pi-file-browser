@@ -35,10 +35,6 @@ export class NavigationInputHandler implements IInputHandler {
       { match: (d) => matchesKey(d, Key.escape), result: Action.Escape },
       { match: (d) => d === 'q', result: Action.Escape },
       { match: (d) => matchesKey(d, Key.tab), result: Action.Tab },
-      { match: (d) => matchesKey(d, Key.pageUp), result: Action.PageUp },
-      { match: (d) => matchesKey(d, Key.pageDown), result: Action.PageDown },
-      // Shortcuts
-      { match: (d) => d === 'e', result: Action.Edit },
     ];
   }
 

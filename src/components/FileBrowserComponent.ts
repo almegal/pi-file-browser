@@ -1,7 +1,8 @@
 // ============================================================
 // FileBrowserComponent — pi-native TUI component
 // (implements Component interface from @earendil-works/pi-tui)
-// Supports four modes: browsing, loading, selecting, viewing
+// Supports three modes: browsing, loading, selecting
+// Enter on file delegates to pi editor, then reopens browser
 // Single Responsibility: render + input handling for the file browser
 // ============================================================
 
@@ -31,17 +32,9 @@ export class FileBrowserComponent implements Component {
   private selectionData: SelectionData | null = null;
   private selectionIndex: number = 0;
 
-  // Viewing mode state
-  private viewingFilePath: string = '';
-  private viewingFileName: string = '';
-  private viewingLines: string[] = [];
-  private viewingScrollOffset: number = 0;
-  private static readonly MAX_VIEW_SIZE = 512 * 1024; // 512 KB
-
   // Result callback and async discovery
   private readonly done: (result: BrowserResult) => void;
   private readonly discoverOptions: DiscoverOptionsFn;
-  private readonly readFile: (path: string) => Promise<string>;
 
   constructor(
     private readonly panel: IPanelModel,
@@ -49,11 +42,9 @@ export class FileBrowserComponent implements Component {
     private readonly tui: { requestRender: () => void },
     done: (result: BrowserResult) => void,
     discoverOptions: DiscoverOptionsFn,
-    readFile: (path: string) => Promise<string>,
   ) {
     this.done = done;
     this.discoverOptions = discoverOptions;
-    this.readFile = readFile;
   }
 
   // ---- Component interface ----
@@ -65,14 +56,6 @@ export class FileBrowserComponent implements Component {
     // In loading mode, ignore all input
     if (this.mode === 'loading') return;
 
-    // In viewing mode, handle scrolling and exit
-    if (this.mode === 'viewing') {
-      this.handleViewingInput(input);
-      this.version++;
-      this.tui.requestRender();
-      return;
-    }
-
     // In selecting mode, handle option navigation
     if (this.mode === 'selecting') {
       this.handleSelectingInput(input);
@@ -81,7 +64,7 @@ export class FileBrowserComponent implements Component {
       return;
     }
 
-    // In browsing mode, handle as before
+    // In browsing mode
     if (input === Direction.Up) {
       this.panel.moveUp();
     } else if (input === Direction.Down) {
@@ -127,14 +110,7 @@ export class FileBrowserComponent implements Component {
         });
         return;
       } else {
-        // Enter on file: open for viewing
-        this.openFileForViewing(selected.path, selected.name);
-        return;
-      }
-    } else if (input === Action.Edit) {
-      // 'e' key on a file in browsing mode — open for editing (delegated to pi)
-      const selected = this.panel.getSelectedEntry();
-      if (selected && !selected.isDirectory) {
+        // Enter on file: open in pi editor
         this.done({ action: 'edit_file', filePath: selected.path });
         return;
       }
@@ -175,9 +151,6 @@ export class FileBrowserComponent implements Component {
       case 'selecting':
         lines = this.renderSelecting(innerWidth);
         break;
-      case 'viewing':
-        lines = this.renderViewing(innerWidth);
-        break;
     }
 
     // Add border
@@ -189,80 +162,6 @@ export class FileBrowserComponent implements Component {
   }
 
   // ---- Input handling for selecting mode ----
-
-  // ---- Input handling for viewing mode ----
-
-  private handleViewingInput(input: Direction | Action): void {
-    const maxLineIdx = Math.max(0, this.viewingLines.length - 1);
-
-    if (input === Direction.Up) {
-      this.viewingScrollOffset = Math.max(0, this.viewingScrollOffset - 1);
-    } else if (input === Direction.Down) {
-      this.viewingScrollOffset = Math.min(maxLineIdx, this.viewingScrollOffset + 1);
-    } else if (input === Action.PageUp) {
-      this.viewingScrollOffset = Math.max(0, this.viewingScrollOffset - this.getViewingPageSize());
-    } else if (input === Action.PageDown) {
-      this.viewingScrollOffset = Math.min(maxLineIdx, this.viewingScrollOffset + this.getViewingPageSize());
-    } else if (input === Action.Escape || input === Direction.Left) {
-      // Exit viewing, return to browsing
-      this.mode = 'browsing';
-      this.viewingFilePath = '';
-      this.viewingLines = [];
-      this.viewingScrollOffset = 0;
-    } else if (input === Action.Edit) {
-      // Delegate editing to pi
-      this.done({ action: 'edit_file', filePath: this.viewingFilePath });
-    }
-  }
-
-  private getViewingPageSize(): number {
-    // Max browsing entries minus header + status + hints + view meta
-    return this.getMaxBrowsingEntries() - 3;
-  }
-
-  private openFileForViewing(filePath: string, fileName: string): void {
-    this.mode = 'loading';
-    this.version++;
-    this.tui.requestRender();
-
-    this.readFile(filePath).then((content) => {
-      const byteSize = new TextEncoder().encode(content).length;
-      if (byteSize > FileBrowserComponent.MAX_VIEW_SIZE) {
-        this.viewingLines = ['\u26A0 File too large (' + formatSize(byteSize) + '). Press Esc to go back.'];
-      } else {
-        // Check for binary content
-        if (this.isBinaryContent(content)) {
-          this.viewingLines = ['\u26A0 Binary file, cannot display. Press Esc to go back.'];
-        } else {
-          this.viewingLines = content.split('\n');
-        }
-      }
-      this.viewingFilePath = filePath;
-      this.viewingFileName = fileName;
-      this.viewingScrollOffset = 0;
-      this.mode = 'viewing';
-      this.version++;
-      this.tui.requestRender();
-    }).catch((err) => {
-      this.viewingLines = ['\u26A0 Error: ' + String(err.message || err)];
-      this.viewingFilePath = filePath;
-      this.viewingFileName = fileName;
-      this.viewingScrollOffset = 0;
-      this.mode = 'viewing';
-      this.version++;
-      this.tui.requestRender();
-    });
-  }
-
-  /** Heuristic: treat content as binary if it contains null bytes in first 8KB */
-  private isBinaryContent(content: string): boolean {
-    const sample = content.slice(0, 8192);
-    for (let i = 0; i < sample.length; i++) {
-      const code = sample.charCodeAt(i);
-      if (code === 0) return true;
-    }
-    return false;
-  }
 
   private handleSelectingInput(input: Direction | Action): void {
     const data = this.selectionData;
@@ -330,7 +229,7 @@ export class FileBrowserComponent implements Component {
     lines.push(status + ' '.repeat(Math.max(0, innerWidth - visibleWidth(status))));
 
     // Help hints
-    const hints = truncateToWidth('\u21B5=open  \u2192=browse  e=edit  \u2191\u2193\u2190  Esc', innerWidth);
+    const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  Esc', innerWidth);
     lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, innerWidth - visibleWidth(hints))) + '\x1b[22m');
 
     return lines;
@@ -405,62 +304,15 @@ export class FileBrowserComponent implements Component {
     return lines;
   }
 
-  private renderViewing(innerWidth: number): string[] {
-    const lines: string[] = [];
-
-    // File info line
-    const infoLine = truncateToWidth(' \u{1F4C4} ' + this.viewingFileName + ' (' + this.viewingLines.length + ' lines)', innerWidth);
-    lines.push('\x1b[1m' + infoLine + ' '.repeat(Math.max(0, innerWidth - visibleWidth(infoLine))) + '\x1b[22m');
-
-    // Separator
-    lines.push('\u2500'.repeat(innerWidth));
-
-    // Content area lines
-    const contentHeight = this.getViewingPageSize();
-    const lineNumWidth = Math.max(3, String(this.viewingLines.length).length);
-
-    for (let i = 0; i < contentHeight; i++) {
-      const lineIdx = this.viewingScrollOffset + i;
-      if (lineIdx < this.viewingLines.length) {
-        const lineNum = String(lineIdx + 1).padStart(lineNumWidth);
-        const prefix = '\x1b[2m' + lineNum + ' \x1b[22m';
-        const prefixWidth = lineNumWidth + 1; // lineNum + space
-        const contentWidth = innerWidth - prefixWidth;
-        const rawLine = this.viewingLines[lineIdx];
-        const truncated = truncateToWidth(rawLine, contentWidth);
-        const padding = Math.max(0, contentWidth - visibleWidth(truncated));
-        lines.push(prefix + truncated + ' '.repeat(padding));
-      } else {
-        lines.push(' '.repeat(innerWidth));
-      }
-    }
-
-    // Status / scroll indicator
-    const scrollPct = this.viewingLines.length > contentHeight
-      ? ' (' + Math.round((this.viewingScrollOffset / Math.max(1, this.viewingLines.length - contentHeight)) * 100) + '%)'
-      : '';
-    const statusText = '\x1b[1mViewing\x1b[22m' + scrollPct;
-    const status = truncateToWidth(statusText, innerWidth);
-    lines.push(status + ' '.repeat(Math.max(0, innerWidth - visibleWidth(status))));
-
-    // Help hints
-    const hints = truncateToWidth('\u2191\u2193/PgUp/PgDn=scroll  e=edit  Esc/\u2190=back', innerWidth);
-    lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, innerWidth - visibleWidth(hints))) + '\x1b[22m');
-
-    return lines;
-  }
-
   // ---- Border rendering ----
 
   private addBorder(innerLines: string[], innerWidth: number): string[] {
     const result: string[] = [];
 
     // Top border with path header
-    const pathLabel = this.mode === 'viewing'
-      ? ' View: ' + this.viewingFileName + ' '
-      : this.mode === 'selecting' && this.selectionData
-        ? ' Open: ' + this.selectionData.directory + ' '
-        : ' ' + this.panel.currentPath + ' ';
+    const pathLabel = this.mode === 'selecting' && this.selectionData
+      ? ' Open: ' + this.selectionData.directory + ' '
+      : ' ' + this.panel.currentPath + ' ';
     const pathHeader = truncateToWidth(pathLabel, innerWidth);
     const pathPad = innerWidth - visibleWidth(pathHeader);
     result.push(TL + H + '\x1b[1m' + pathHeader + ' '.repeat(pathPad) + '\x1b[22m' + H + TR);

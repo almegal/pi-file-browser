@@ -52,7 +52,6 @@ export class FileBrowserApp {
                 tui,
                 done,
                 (directory) => this.discoverOptions(directory),
-                (filePath) => this.fsProvider.readFile(filePath),
               );
               return component;
             },

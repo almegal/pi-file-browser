@@ -24,9 +24,6 @@ export enum Action {
   Enter = 'ENTER',
   Escape = 'ESCAPE',
   Tab = 'TAB',
-  PageUp = 'PAGE_UP',
-  PageDown = 'PAGE_DOWN',
-  Edit = 'EDIT',
 }
 
 /** Result of a navigation attempt */
@@ -92,4 +89,4 @@ export interface SelectionData {
 export type DiscoverOptionsFn = (directory: string) => Promise<SelectionData>;
 
 /** Component mode */
-export type BrowserMode = 'browsing' | 'loading' | 'selecting' | 'viewing';
+export type BrowserMode = 'browsing' | 'loading' | 'selecting';
