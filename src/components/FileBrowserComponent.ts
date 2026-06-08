@@ -10,6 +10,14 @@ import { IPanelModel } from '../interfaces/IPanelModel';
 import { IInputHandler } from '../interfaces/IInputHandler';
 import { Direction, Action, FileEntry } from '../types';
 
+// Box-drawing characters for the border
+const TL = '╭';
+const TR = '╮';
+const BL = '╰';
+const BR = '╯';
+const H = '─';
+const V = '│';
+
 export class FileBrowserComponent implements Component {
   // Render cache
   private cachedLines: string[] = [];
@@ -56,7 +64,6 @@ export class FileBrowserComponent implements Component {
       this.onClose();
       return;
     }
-    // Tab is ignored in single-pane mode
 
     this.version++;
     this.tui.requestRender();
@@ -72,30 +79,47 @@ export class FileBrowserComponent implements Component {
       return this.cachedLines;
     }
 
+    const innerWidth = width - 2; // subtract left+right border
+    if (innerWidth < 10) {
+      // Too narrow to render anything useful
+      const line = truncateToWidth('Browser too narrow', width);
+      return [line];
+    }
+
     const lines: string[] = [];
 
-    // Path header
-    lines.push(this.renderPathHeader(this.panel.currentPath, width));
+    // Top border with path header
+    const pathLabel = ` ${this.panel.currentPath} `;
+    const pathHeader = truncateToWidth(pathLabel, innerWidth);
+    const pathPad = innerWidth - visibleWidth(pathHeader);
+    lines.push(TL + H + `\x1b[1m${pathHeader}${' '.repeat(pathPad)}\x1b[22m` + H + TR);
 
     // Separator under header
-    lines.push('─'.repeat(width));
+    lines.push(V + '─'.repeat(innerWidth) + V);
 
     // File entries
     const maxEntries = this.getMaxEntries();
     const entries = this.renderPanelEntries(
       this.panel.entries,
       this.panel.selectedIndex,
-      width,
+      innerWidth,
       maxEntries,
     );
 
     for (let i = 0; i < maxEntries; i++) {
-      lines.push(entries[i] ?? ''.padEnd(width));
+      const inner = entries[i] ?? ''.padEnd(innerWidth);
+      lines.push(V + inner + V);
     }
 
+    // Bottom separator
+    lines.push(V + '─'.repeat(innerWidth) + V);
     // Status bar
-    lines.push('─'.repeat(width));
-    lines.push(truncateToWidth(this.renderStatusBar(), width));
+    const status = truncateToWidth(this.renderStatusBar(), innerWidth);
+    const statusPad = innerWidth - visibleWidth(status);
+    lines.push(V + status + ' '.repeat(statusPad) + V);
+
+    // Bottom border
+    lines.push(BL + H.repeat(innerWidth) + BR);
 
     this.cachedLines = lines;
     this.cachedWidth = width;
@@ -105,20 +129,14 @@ export class FileBrowserComponent implements Component {
 
   // ---- Private rendering helpers ----
 
-  private renderPathHeader(path: string, panelWidth: number): string {
-    const label = ` ${path} `;
-    const header = truncateToWidth(label, panelWidth).padEnd(panelWidth);
-    return `\x1b[1m${header}\x1b[22m`;
-  }
-
   private getMaxEntries(): number {
-    return 30;
+    return 20;
   }
 
   private renderPanelEntries(
     entries: ReadonlyArray<FileEntry>,
     selectedIndex: number,
-    panelWidth: number,
+    innerWidth: number,
     maxVisible: number,
   ): string[] {
     const lines: string[] = [];
@@ -128,7 +146,7 @@ export class FileBrowserComponent implements Component {
     for (let displayIdx = 0; displayIdx < maxVisible; displayIdx++) {
       const entryIdx = displayIdx + scrollOffset;
       if (entryIdx >= entries.length) {
-        lines.push('');
+        lines.push(' '.repeat(innerWidth));
         continue;
       }
 
@@ -139,9 +157,9 @@ export class FileBrowserComponent implements Component {
 
       let entryText = ` ${icon} ${entry.name}${suffix}`;
 
-      entryText = truncateToWidth(entryText, panelWidth);
+      entryText = truncateToWidth(entryText, innerWidth);
       const entryVisibleWidth = visibleWidth(entryText);
-      const padding = Math.max(0, panelWidth - entryVisibleWidth);
+      const padding = Math.max(0, innerWidth - entryVisibleWidth);
       entryText += ' '.repeat(padding);
 
       if (isSelected) {
@@ -179,7 +197,7 @@ export class FileBrowserComponent implements Component {
     }
 
     return ` \x1b[1m${entryInfo}\x1b[22m ` +
-      `\x1b[2m│ ↑↓:Move ←:Back →/Enter:Open Esc:Exit\x1b[22m`;
+      `\x1b[2m│ ↑↓←→ Enter Esc\x1b[22m`;
   }
 }
 

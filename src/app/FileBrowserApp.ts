@@ -1,7 +1,7 @@
 // ============================================================
 // FileBrowserApp — orchestrator: composes the extension command
 // (Composition Root: all dependency wiring happens here)
-// Uses pi's ctx.ui.custom() to host the TUI component
+// Uses pi's ctx.ui.custom() with overlay mode for centered widget
 // ============================================================
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
@@ -32,15 +32,25 @@ export class FileBrowserApp {
         const panel = new PanelModel(this.fsProvider, homeDir);
         await panel.refresh();
 
-        await ctx.ui.custom<void>((tui, _theme, _keybindings, done) => {
-          const component = new FileBrowserComponent(
-            panel,
-            this.inputHandler,
-            tui,
-            () => done(undefined),
-          );
-          return component;
-        });
+        await ctx.ui.custom<void>(
+          (tui, _theme, _keybindings, done) => {
+            const component = new FileBrowserComponent(
+              panel,
+              this.inputHandler,
+              tui,
+              () => done(undefined),
+            );
+            return component;
+          },
+          {
+            overlay: true,
+            overlayOptions: {
+              width: '60%',
+              anchor: 'center',
+              margin: { top: 2, bottom: 2 },
+            },
+          },
+        );
       },
     });
   }
