@@ -71,30 +71,8 @@ export class FileBrowserComponent implements Component {
       return;
     } else if (input === Action.Enter) {
       const selected = this.panel.getSelectedEntry();
-      if (!selected) return;
-
-      if (selected.isDirectory) {
-        const selectedPath = selected.path;
-        this.mode = 'loading';
-        this.version++;
-        this.tui.requestRender();
-
-        this.discoverOptions(selectedPath).then((data) => {
-          this.selectionData = data;
-          this.selectionIndex = 0;
-          this.mode = 'selecting';
-          this.version++;
-          this.tui.requestRender();
-        }).catch(() => {
-          this.mode = 'browsing';
-          this.version++;
-          this.tui.requestRender();
-        });
-        return;
-      } else {
-        this.done({ action: 'edit_file', filePath: selected.path });
-        return;
-      }
+      if (selected) this.actOnSelected(selected);
+      return;
     } else if (input === Action.Escape) {
       this.done({ action: 'cancel' });
       return;
@@ -108,6 +86,29 @@ export class FileBrowserComponent implements Component {
 
     this.version++;
     this.tui.requestRender();
+  }
+
+  private actOnSelected(selected: FileEntry): void {
+    if (selected.isDirectory) {
+      const selectedPath = selected.path;
+      this.mode = 'loading';
+      this.version++;
+      this.tui.requestRender();
+
+      this.discoverOptions(selectedPath).then((data) => {
+        this.selectionData = data;
+        this.selectionIndex = 0;
+        this.mode = 'selecting';
+        this.version++;
+        this.tui.requestRender();
+      }).catch(() => {
+        this.mode = 'browsing';
+        this.version++;
+        this.tui.requestRender();
+      });
+    } else {
+      this.done({ action: 'edit_file', filePath: selected.path });
+    }
   }
 
   private enterSearch(): void {
@@ -152,9 +153,12 @@ export class FileBrowserComponent implements Component {
         }
         return;
       }
-      // Enter — confirm selection, exit search
+      // Enter — confirm selection, exit search and act on entry
       if (code === 0x0d) {
+        const selected = this.panel.getSelectedEntry();
         this.exitSearch(false);
+        if (!selected) return;
+        this.actOnSelected(selected);
         return;
       }
       // Printable char (including j, k, h, l)
@@ -177,7 +181,16 @@ export class FileBrowserComponent implements Component {
     } else if (input === Direction.Left || input === Action.Escape) {
       this.exitSearch(true);
     } else if (input === Action.Enter) {
+      const selected = this.panel.getSelectedEntry();
       this.exitSearch(false);
+      if (selected) this.actOnSelected(selected);
+    } else if (input === Direction.Right) {
+      const target = this.panel.getSelectedEntry();
+      if (target && target.isDirectory) {
+        this.exitSearch(false);
+        this.panel.navigateTo(target.path).then(() => { this.version++; this.tui.requestRender(); });
+      }
+      return;
     }
   }
 
