@@ -1,3 +1,5 @@
+// === PanelModel: Panel state (navigation, selection, search filter) ===
+
 import { IPanelModel } from '../interfaces/IPanelModel';
 import { IFileSystemProvider } from '../interfaces/IFileSystemProvider';
 import { FileEntry } from '../types';
@@ -5,7 +7,9 @@ import { FileEntry } from '../types';
 export class PanelModel implements IPanelModel {
   private _currentPath: string;
   private _selectedIndex: number = 0;
+  private _allEntries: FileEntry[] = [];
   private _entries: FileEntry[] = [];
+  private _searchQuery: string = '';
 
   constructor(
     private readonly fsProvider: IFileSystemProvider,
@@ -17,6 +21,8 @@ export class PanelModel implements IPanelModel {
   get currentPath(): string { return this._currentPath; }
   get selectedIndex(): number { return this._selectedIndex; }
   get entries(): ReadonlyArray<FileEntry> { return this._entries; }
+  get searchQuery(): string { return this._searchQuery; }
+  get totalEntries(): number { return this._allEntries.length; }
 
   getSelectedEntry(): FileEntry | undefined {
     if (this._entries.length === 0) return undefined;
@@ -29,8 +35,8 @@ export class PanelModel implements IPanelModel {
       throw new Error(`Not a directory: ${path}`);
     }
     this._currentPath = path;
-    this._entries = await this.fsProvider.listDirectory(path);
-    this._selectedIndex = 0;
+    this._allEntries = await this.fsProvider.listDirectory(path);
+    this._applyFilter();
   }
 
   selectIndex(index: number): void {
@@ -58,6 +64,7 @@ export class PanelModel implements IPanelModel {
     const selected = this._entries[this._selectedIndex];
     if (!selected) return false;
     if (selected.isDirectory) {
+      this._searchQuery = '';
       await this.navigateTo(selected.path);
       return true;
     }
@@ -65,7 +72,32 @@ export class PanelModel implements IPanelModel {
   }
 
   async refresh(): Promise<void> {
-    this._entries = await this.fsProvider.listDirectory(this._currentPath);
-    this.selectIndex(this._selectedIndex);
+    this._allEntries = await this.fsProvider.listDirectory(this._currentPath);
+    this._applyFilter();
+  }
+
+  setSearchQuery(query: string): void {
+    this._searchQuery = query;
+    this._applyFilter();
+  }
+
+  clearSearch(): void {
+    this._searchQuery = '';
+    this._applyFilter();
+  }
+
+  private _applyFilter(): void {
+    if (this._searchQuery === '') {
+      this._entries = [...this._allEntries];
+    } else {
+      const q = this._searchQuery.toLowerCase();
+      this._entries = this._allEntries.filter(
+        (e) => e.name.toLowerCase().includes(q),
+      );
+    }
+    this._selectedIndex = Math.min(
+      this._selectedIndex,
+      Math.max(0, this._entries.length - 1),
+    );
   }
 }

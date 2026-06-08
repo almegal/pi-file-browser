@@ -1,3 +1,5 @@
+// === FileBrowserComponent: TUI rendering + input handling for file browser ===
+
 import type { Component } from '@earendil-works/pi-tui';
 import { truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
 import { IPanelModel } from '../interfaces/IPanelModel';
@@ -16,6 +18,10 @@ export class FileBrowserComponent implements Component {
   private selectionData: SelectionData | null = null;
   private selectionIndex: number = 0;
 
+  private searchActive: boolean = false;
+  private searchQuery: string = '';
+  private preSearchIndex: number = 0;
+
   private readonly done: (result: BrowserResult) => void;
   private readonly discoverOptions: DiscoverOptionsFn;
 
@@ -31,17 +37,27 @@ export class FileBrowserComponent implements Component {
   }
 
   handleInput(data: string): void {
-    const input = this.inputHandler.handleKey(data);
-    if (input === null) return;
-
     if (this.mode === 'loading') return;
 
     if (this.mode === 'selecting') {
+      const input = this.inputHandler.handleKey(data);
+      if (input === null) return;
       this.handleSelectingInput(input);
       this.version++;
       this.tui.requestRender();
       return;
     }
+
+    if (this.searchActive) {
+      this.handleSearchInput(data);
+      this.version++;
+      this.tui.requestRender();
+      return;
+    }
+
+    // Browsing mode
+    const input = this.inputHandler.handleKey(data);
+    if (input === null) return;
 
     if (input === Direction.Up) {
       this.panel.moveUp();
@@ -82,10 +98,87 @@ export class FileBrowserComponent implements Component {
     } else if (input === Action.Escape) {
       this.done({ action: 'cancel' });
       return;
+    } else if (input === Action.Search) {
+      this.enterSearch();
+    } else if (input === Action.Backspace) {
+      // In browsing mode, backspace navigates up (same as left/h)
+      this.panel.goUp().then(() => { this.version++; this.tui.requestRender(); });
+      return;
     }
 
     this.version++;
     this.tui.requestRender();
+  }
+
+  private enterSearch(): void {
+    this.searchActive = true;
+    this.searchQuery = '';
+    this.preSearchIndex = this.panel.selectedIndex;
+    this.panel.setSearchQuery('');
+  }
+
+  private exitSearch(restorePosition: boolean): void {
+    this.searchActive = false;
+    this.searchQuery = '';
+    if (restorePosition && this.panel.entries.length > 0) {
+      this.panel.clearSearch();
+      // Try to restore pre-search position by finding the same entry
+      // Since clearSearch resets to full list, find the entry we had before
+      // preSearchIndex was in the full list, so it should be valid
+      if (this.preSearchIndex < this.panel.entries.length) {
+        this.panel.selectIndex(this.preSearchIndex);
+      }
+    } else {
+      this.panel.clearSearch();
+    }
+  }
+
+  private handleSearchInput(data: string): void {
+    // Single-char: control keys or search input
+    if (data.length === 1) {
+      const code = data.charCodeAt(0);
+      // Escape
+      if (code === 0x1b) {
+        this.exitSearch(true);
+        return;
+      }
+      // Backspace
+      if (code === 0x7f || code === 0x08) {
+        if (this.searchQuery.length > 0) {
+          this.searchQuery = this.searchQuery.slice(0, -1);
+          this.panel.setSearchQuery(this.searchQuery);
+        } else {
+          this.exitSearch(true);
+        }
+        return;
+      }
+      // Enter — confirm selection, exit search
+      if (code === 0x0d) {
+        this.exitSearch(false);
+        return;
+      }
+      // Printable char (including j, k, h, l)
+      if (code >= 0x20 && code < 0x7f) {
+        this.searchQuery += data;
+        this.panel.setSearchQuery(this.searchQuery);
+        return;
+      }
+      return;
+    }
+
+    // Multi-char: escape sequences (arrows etc.)
+    const input = this.inputHandler.handleKey(data);
+    if (input === null) return;
+
+    if (input === Direction.Up) {
+      this.panel.moveUp();
+    } else if (input === Direction.Down) {
+      this.panel.moveDown();
+    } else if (input === Direction.Left || input === Action.Escape) {
+      this.exitSearch(true);
+    } else if (input === Action.Enter) {
+      this.exitSearch(false);
+    }
   }
 
   invalidate(): void {
@@ -106,6 +199,7 @@ export class FileBrowserComponent implements Component {
       case 'browsing': lines = this.renderBrowsing(innerWidth); break;
       case 'loading': lines = this.renderLoading(innerWidth); break;
       case 'selecting': lines = this.renderSelecting(innerWidth); break;
+      default: lines = this.renderBrowsing(innerWidth); break;
     }
 
     const bordered = this.addBorder(lines, innerWidth);
@@ -143,11 +237,25 @@ export class FileBrowserComponent implements Component {
     const entries = this.renderPanelEntries(this.panel.entries, this.panel.selectedIndex, w, max);
     for (let i = 0; i < max; i++) lines.push(entries[i] ?? ' '.repeat(w));
 
-    const status = truncateToWidth(this.renderStatusBar(), w);
-    lines.push(status + ' '.repeat(Math.max(0, w - visibleWidth(status))));
+    if (this.searchActive) {
+      const matchCount = this.panel.entries.length;
+      const totalCount = this.panel.totalEntries;
+      const searchLabel = '\u{1F50D} /' + this.searchQuery;
+      const countLabel = matchCount === totalCount
+        ? ''
+        : ' (' + matchCount + '/' + totalCount + ')';
+      const status = truncateToWidth(searchLabel + countLabel, w);
+      lines.push('\x1b[1m' + status + '\x1b[22m' + ' '.repeat(Math.max(0, w - visibleWidth(status))));
 
-    const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  Esc', w);
-    lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, w - visibleWidth(hints))) + '\x1b[22m');
+      const hints = truncateToWidth('Enter=confirm  Esc/\u2190=cancel  \u232B=delete', w);
+      lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, w - visibleWidth(hints))) + '\x1b[22m');
+    } else {
+      const status = truncateToWidth(this.renderStatusBar(), w);
+      lines.push('\x1b[1m' + status + '\x1b[22m' + ' '.repeat(Math.max(0, w - visibleWidth(status))));
+
+      const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  /=search  Esc', w);
+      lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, w - visibleWidth(hints))) + '\x1b[22m');
+    }
     return lines;
   }
 
@@ -215,7 +323,7 @@ export class FileBrowserComponent implements Component {
       const suffix = entry.isDirectory ? '/' : '';
       let text = truncateToWidth(' ' + icon + ' ' + entry.name + suffix, w);
       text += ' '.repeat(Math.max(0, w - visibleWidth(text)));
-      if (idx === selectedIndex) text = '\x1b[7m' + text + '\x1b[27m]';
+      if (idx === selectedIndex) text = '\x1b[7m' + text + '\x1b[27m';
       else if (entry.isDirectory) text = '\x1b[1m' + text + '\x1b[22m';
       lines.push(text);
     }

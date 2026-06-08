@@ -17,6 +17,8 @@ export enum Action {
   Enter = 'ENTER',
   Escape = 'ESCAPE',
   Tab = 'TAB',
+  Search = 'SEARCH',
+  Backspace = 'BACKSPACE',
 }
 
 export interface NavigationResult {
