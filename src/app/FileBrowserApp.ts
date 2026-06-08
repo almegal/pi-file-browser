@@ -39,6 +39,9 @@ export class FileBrowserApp {
           currentPath = this.fsProvider.getHomeDirectory();
         }
 
+        // Main loop: browse → select directory → choose action → act or re-browse
+        // On cancel/ESC from selection dialog, return to browser at same directory.
+        // On session switch, return immediately (old ctx is stale after switchSession).
         while (true) {
           const result = await this.openBrowser(currentPath, ctx);
           if (result.action === 'cancel') {
@@ -47,14 +50,14 @@ export class FileBrowserApp {
 
           if (result.action === 'select_directory') {
             const action = await this.handleDirectorySelection(result.path, ctx);
-            if (action === 'browse') {
-              currentPath = result.path;
-              continue;
-            } else if (action === 'session_switched') {
-              return;
-            } else {
+            if (action === 'session_switched') {
+              // ctx is stale after switchSession — must not use it further
               return;
             }
+            // 'cancel' (ESC or Cancel) — reopen browser at same directory
+            // 'browse' removed: arrow keys handle navigation inside the browser
+            currentPath = result.path;
+            continue;
           }
         }
       },
@@ -95,7 +98,7 @@ export class FileBrowserApp {
   private async handleDirectorySelection(
     directory: string,
     ctx: ExtensionCommandContext,
-  ): Promise<'browse' | 'session_switched' | 'cancel'> {
+  ): Promise<'session_switched' | 'cancel'> {
     const sessionInfo = await this.discoverSessions(directory);
     const configInfo = await this.configDiscovery.discover(directory);
 
@@ -107,16 +110,14 @@ export class FileBrowserApp {
     const choice = await ctx.ui.select(title, options.map((o) => o.label));
 
     if (!choice) {
+      // ESC pressed — return to browser
       return 'cancel';
     }
 
     const selected = options.find((o) => o.label === choice);
     if (!selected || selected.isCancel) {
+      // Cancel selected — return to browser
       return 'cancel';
-    }
-
-    if (selected.isBrowse) {
-      return 'browse';
     }
 
     if (selected.isNewSession) {
@@ -198,16 +199,9 @@ export class FileBrowserApp {
     }
 
     options.push({
-      id: 'browse',
-      label: '\u{1F4C2} Browse inside',
-      description: 'Navigate into this directory in the file browser',
-      isBrowse: true,
-    });
-
-    options.push({
       id: 'cancel',
-      label: '\u21A9 Cancel',
-      description: 'Stay in current session',
+      label: '\u21A9 Back to browser',
+      description: 'Return to the file browser',
       isCancel: true,
     });
 
@@ -218,35 +212,34 @@ export class FileBrowserApp {
     directory: string,
     ctx: ExtensionCommandContext,
   ): Promise<'session_switched' | 'cancel'> {
-    try {
-      ctx.ui.setStatus('file-browser', 'Creating new session...');
+    ctx.ui.setStatus('file-browser', 'Creating new session...');
 
-      const sm = SessionManager.create(directory);
-      sm.appendCustomEntry('file-browser-workspace', { directory });
+    const sm = SessionManager.create(directory);
+    sm.appendCustomEntry('file-browser-workspace', { directory });
 
-      const sessionFile = sm.getSessionFile();
-      if (!sessionFile) {
-        ctx.ui.notify('Failed to create session file', 'error');
-        return 'cancel';
-      }
-
+    const sessionFile = sm.getSessionFile();
+    if (!sessionFile) {
+      ctx.ui.notify('Failed to create session file', 'error');
       ctx.ui.setStatus('file-browser', undefined);
+      return 'cancel';
+    }
 
-      const result = await ctx.switchSession(sessionFile, {
+    // After switchSession resolves, ctx is stale. All post-switch work
+    // must go into withSession using the new context. Status bar is
+    // cleared in withSession because the old ctx becomes invalid.
+    try {
+      await ctx.switchSession(sessionFile, {
         withSession: async (newCtx) => {
+          newCtx.ui.setStatus('file-browser', undefined);
           newCtx.ui.notify('Switched to new session in ' + this.shortenPath(directory), 'info');
         },
       });
-
-      if (result.cancelled) {
-        return 'cancel';
-      }
-
+      // ctx is stale — return immediately, do not touch ctx
       return 'session_switched';
-    } catch (err) {
+    } catch {
+      // switchSession threw before replacement — ctx is still valid
+      ctx.ui.notify('Failed to create session', 'error');
       ctx.ui.setStatus('file-browser', undefined);
-      const message = err instanceof Error ? err.message : String(err);
-      ctx.ui.notify('Failed to create session: ' + message, 'error');
       return 'cancel';
     }
   }
@@ -256,26 +249,22 @@ export class FileBrowserApp {
     directory: string,
     ctx: ExtensionCommandContext,
   ): Promise<'session_switched' | 'cancel'> {
-    try {
-      ctx.ui.setStatus('file-browser', 'Switching session...');
+    ctx.ui.setStatus('file-browser', 'Switching session...');
 
-      const result = await ctx.switchSession(sessionPath, {
+    // Same stale-ctx rule: all post-switch work goes into withSession
+    try {
+      await ctx.switchSession(sessionPath, {
         withSession: async (newCtx) => {
+          newCtx.ui.setStatus('file-browser', undefined);
           newCtx.ui.notify('Resumed session in ' + this.shortenPath(directory), 'info');
         },
       });
-
-      ctx.ui.setStatus('file-browser', undefined);
-
-      if (result.cancelled) {
-        return 'cancel';
-      }
-
+      // ctx is stale — return immediately
       return 'session_switched';
-    } catch (err) {
+    } catch {
+      // switchSession threw before replacement — ctx is still valid
+      ctx.ui.notify('Failed to switch session', 'error');
       ctx.ui.setStatus('file-browser', undefined);
-      const message = err instanceof Error ? err.message : String(err);
-      ctx.ui.notify('Failed to switch session: ' + message, 'error');
       return 'cancel';
     }
   }

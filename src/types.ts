@@ -73,6 +73,5 @@ export interface DirectoryOption {
   readonly description: string;
   readonly sessionPath?: string;
   readonly isNewSession?: boolean;
-  readonly isBrowse?: boolean;
   readonly isCancel?: boolean;
 }
