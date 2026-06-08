@@ -9,7 +9,6 @@ import { IFileSystemProvider } from '../interfaces/IFileSystemProvider';
 import { IInputHandler } from '../interfaces/IInputHandler';
 import { PanelModel } from '../models/PanelModel';
 import { FileBrowserComponent } from '../components/FileBrowserComponent';
-import { ActivePanel } from '../types';
 
 export class FileBrowserApp {
   constructor(
@@ -20,7 +19,7 @@ export class FileBrowserApp {
   /** Register the /files command with pi */
   register(pi: ExtensionAPI): void {
     pi.registerCommand('files', {
-      description: 'Open dual-pane file browser (Total Commander style)',
+      description: 'Open single-pane file browser',
 
       handler: async (_args, ctx) => {
         if (ctx.mode !== 'tui') {
@@ -30,23 +29,15 @@ export class FileBrowserApp {
 
         const homeDir = this.fsProvider.getHomeDirectory();
 
-        // Create panel models
-        const leftPanel = new PanelModel(this.fsProvider, homeDir, ActivePanel.Left);
-        const rightPanel = new PanelModel(this.fsProvider, homeDir, ActivePanel.Right);
+        const panel = new PanelModel(this.fsProvider, homeDir);
+        await panel.refresh();
 
-        // Initial load
-        await leftPanel.refresh();
-        await rightPanel.refresh();
-
-        // Host the component via pi's custom UI
         await ctx.ui.custom<void>((tui, _theme, _keybindings, done) => {
           const component = new FileBrowserComponent(
-            leftPanel,
-            rightPanel,
+            panel,
             this.inputHandler,
             tui,
             () => done(undefined),
-            ActivePanel.Left,
           );
           return component;
         });

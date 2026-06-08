@@ -3,7 +3,7 @@
 // (Single Responsibility: only state management, no rendering)
 // ============================================================
 
-import { FileEntry, ActivePanel } from '../types';
+import { FileEntry } from '../types';
 
 export interface IPanelModel {
   /** Current directory path */
@@ -14,9 +14,6 @@ export interface IPanelModel {
 
   /** File entries in current directory */
   readonly entries: ReadonlyArray<FileEntry>;
-
-  /** Which panel this is */
-  readonly panelId: ActivePanel;
 
   /** Navigate to a new directory */
   navigateTo(path: string): Promise<void>;

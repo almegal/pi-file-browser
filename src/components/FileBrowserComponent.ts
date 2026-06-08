@@ -1,14 +1,14 @@
 // ============================================================
 // FileBrowserComponent — pi-native TUI component
 // (implements Component interface from @earendil-works/pi-tui)
-// Single Responsibility: render + input handling for the dual-pane file browser
+// Single Responsibility: render + input handling for the single-pane file browser
 // ============================================================
 
 import type { Component } from '@earendil-works/pi-tui';
 import { truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
 import { IPanelModel } from '../interfaces/IPanelModel';
 import { IInputHandler } from '../interfaces/IInputHandler';
-import { Direction, Action, ActivePanel, FileEntry } from '../types';
+import { Direction, Action, FileEntry } from '../types';
 
 export class FileBrowserComponent implements Component {
   // Render cache
@@ -18,21 +18,11 @@ export class FileBrowserComponent implements Component {
   private cachedVersion = -1;
 
   constructor(
-    private readonly leftPanel: IPanelModel,
-    private readonly rightPanel: IPanelModel,
+    private readonly panel: IPanelModel,
     private readonly inputHandler: IInputHandler,
     private readonly tui: { requestRender: () => void },
     private readonly onClose: () => void,
-    private activePanelId: ActivePanel = ActivePanel.Left,
   ) {}
-
-  get activePanel(): IPanelModel {
-    return this.activePanelId === ActivePanel.Left ? this.leftPanel : this.rightPanel;
-  }
-
-  get inactivePanel(): IPanelModel {
-    return this.activePanelId === ActivePanel.Left ? this.rightPanel : this.leftPanel;
-  }
 
   // ---- Component interface ----
 
@@ -41,35 +31,32 @@ export class FileBrowserComponent implements Component {
     if (input === null) return;
 
     if (input === Direction.Up) {
-      this.activePanel.moveUp();
+      this.panel.moveUp();
     } else if (input === Direction.Down) {
-      this.activePanel.moveDown();
+      this.panel.moveDown();
     } else if (input === Direction.Left) {
-      // Go up to parent directory
-      this.activePanel.goUp().then(() => {
+      this.panel.goUp().then(() => {
         this.version++;
         this.tui.requestRender();
       });
-      return; // async — render happens in promise
+      return;
     } else if (input === Direction.Right) {
-      this.activePanel.goInto().then(() => {
+      this.panel.goInto().then(() => {
         this.version++;
         this.tui.requestRender();
       });
       return;
     } else if (input === Action.Enter) {
-      this.activePanel.goInto().then(() => {
+      this.panel.goInto().then(() => {
         this.version++;
         this.tui.requestRender();
       });
       return;
-    } else if (input === Action.Tab) {
-      this.activePanelId =
-        this.activePanelId === ActivePanel.Left ? ActivePanel.Right : ActivePanel.Left;
     } else if (input === Action.Escape) {
       this.onClose();
       return;
     }
+    // Tab is ignored in single-pane mode
 
     this.version++;
     this.tui.requestRender();
@@ -87,50 +74,23 @@ export class FileBrowserComponent implements Component {
 
     const lines: string[] = [];
 
-    // Calculate panel widths
-    const separatorWidth = 1;
-    const leftWidth = Math.floor((width - separatorWidth) / 2);
-    const rightWidth = width - leftWidth - separatorWidth;
+    // Path header
+    lines.push(this.renderPathHeader(this.panel.currentPath, width));
 
-    const leftActive = this.activePanelId === ActivePanel.Left;
+    // Separator under header
+    lines.push('─'.repeat(width));
 
-    // Render path headers
-    const leftHeader = this.renderPathHeader(
-      this.leftPanel.currentPath,
-      leftWidth,
-      leftActive,
-    );
-    const rightHeader = this.renderPathHeader(
-      this.rightPanel.currentPath,
-      rightWidth,
-      !leftActive,
-    );
-    lines.push(leftHeader + '│' + rightHeader);
-
-    // Separator line under headers
-    lines.push('─'.repeat(leftWidth) + '┼' + '─'.repeat(rightWidth));
-
-    // Render file entries
+    // File entries
     const maxEntries = this.getMaxEntries();
-    const leftEntries = this.renderPanelEntries(
-      this.leftPanel.entries,
-      this.leftPanel.selectedIndex,
-      leftWidth,
-      leftActive,
-      maxEntries,
-    );
-    const rightEntries = this.renderPanelEntries(
-      this.rightPanel.entries,
-      this.rightPanel.selectedIndex,
-      rightWidth,
-      !leftActive,
+    const entries = this.renderPanelEntries(
+      this.panel.entries,
+      this.panel.selectedIndex,
+      width,
       maxEntries,
     );
 
     for (let i = 0; i < maxEntries; i++) {
-      const leftLine = leftEntries[i] ?? ''.padEnd(leftWidth);
-      const rightLine = rightEntries[i] ?? ''.padEnd(rightWidth);
-      lines.push(leftLine + '│' + rightLine);
+      lines.push(entries[i] ?? ''.padEnd(width));
     }
 
     // Status bar
@@ -145,17 +105,13 @@ export class FileBrowserComponent implements Component {
 
   // ---- Private rendering helpers ----
 
-  private renderPathHeader(path: string, panelWidth: number, isActive: boolean): string {
-    const label = isActive ? ` ${path} ` : ` ${path}`;
-    const suffix = isActive ? ' ' : '';
+  private renderPathHeader(path: string, panelWidth: number): string {
+    const label = ` ${path} `;
     const header = truncateToWidth(label, panelWidth).padEnd(panelWidth);
-    // Active panel gets bold header
-    return isActive ? `\x1b[1m${header}\x1b[22m${suffix}` : header;
+    return `\x1b[1m${header}\x1b[22m`;
   }
 
   private getMaxEntries(): number {
-    // Assume we use roughly 20 lines total, leaving room for header, separator, status
-    // This is an estimate — pi-tui will handle scrolling
     return 30;
   }
 
@@ -163,12 +119,10 @@ export class FileBrowserComponent implements Component {
     entries: ReadonlyArray<FileEntry>,
     selectedIndex: number,
     panelWidth: number,
-    isActive: boolean,
     maxVisible: number,
   ): string[] {
     const lines: string[] = [];
 
-    // Calculate scroll window to keep selected item visible
     const scrollOffset = this.calculateScrollOffset(entries.length, selectedIndex, maxVisible);
 
     for (let displayIdx = 0; displayIdx < maxVisible; displayIdx++) {
@@ -183,27 +137,17 @@ export class FileBrowserComponent implements Component {
       const icon = entry.isDirectory ? '\u{1F4C1}' : '\u{1F4C4}';
       const suffix = entry.isDirectory ? '/' : '';
 
-      // Build entry text (visibleWidth accounts for emoji width)
       let entryText = ` ${icon} ${entry.name}${suffix}`;
 
-      // Truncate to fit panel width
       entryText = truncateToWidth(entryText, panelWidth);
-      // Pad with spaces (need to account for ANSI codes)
       const entryVisibleWidth = visibleWidth(entryText);
       const padding = Math.max(0, panelWidth - entryVisibleWidth);
       entryText += ' '.repeat(padding);
 
-      if (isSelected && isActive) {
-        // Selected + active: reverse video
+      if (isSelected) {
         entryText = `\x1b[7m${entryText}\x1b[27m`;
-      } else if (isSelected) {
-        // Selected + inactive: dim underline
-        entryText = `\x1b[4m${entryText}\x1b[24m`;
       } else if (entry.isDirectory) {
-        // Directories get bold in active panel
-        if (isActive) {
-          entryText = `\x1b[1m${entryText}\x1b[22m`;
-        }
+        entryText = `\x1b[1m${entryText}\x1b[22m`;
       }
 
       lines.push(entryText);
@@ -225,8 +169,7 @@ export class FileBrowserComponent implements Component {
   }
 
   private renderStatusBar(): string {
-    const selected = this.activePanel.entries[this.activePanel.selectedIndex];
-    const panelLabel = this.activePanelId === ActivePanel.Left ? 'LEFT' : 'RIGHT';
+    const selected = this.panel.entries[this.panel.selectedIndex];
 
     let entryInfo = '(empty)';
     if (selected) {
@@ -235,8 +178,8 @@ export class FileBrowserComponent implements Component {
       entryInfo = `${type} ${selected.name}${size}`;
     }
 
-    return ` \x1b[1m[${panelLabel}]\x1b[22m ${entryInfo} ` +
-      `\x1b[2m│ ↑↓:Move ←:Back →/Enter:Open Tab:Switch Esc:Exit\x1b[22m`;
+    return ` \x1b[1m${entryInfo}\x1b[22m ` +
+      `\x1b[2m│ ↑↓:Move ←:Back →/Enter:Open Esc:Exit\x1b[22m`;
   }
 }
 

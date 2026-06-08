@@ -26,12 +26,6 @@ export enum Action {
   Tab = 'TAB',
 }
 
-/** Which panel is currently active */
-export enum ActivePanel {
-  Left = 'LEFT',
-  Right = 'RIGHT',
-}
-
 /** Result of a navigation attempt */
 export interface NavigationResult {
   readonly success: boolean;

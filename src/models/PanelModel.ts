@@ -5,7 +5,7 @@
 
 import { IPanelModel } from '../interfaces/IPanelModel';
 import { IFileSystemProvider } from '../interfaces/IFileSystemProvider';
-import { FileEntry, ActivePanel } from '../types';
+import { FileEntry } from '../types';
 
 export class PanelModel implements IPanelModel {
   private _currentPath: string;
@@ -15,7 +15,6 @@ export class PanelModel implements IPanelModel {
   constructor(
     private readonly fsProvider: IFileSystemProvider,
     initialPath: string,
-    public readonly panelId: ActivePanel,
   ) {
     this._currentPath = initialPath;
   }
