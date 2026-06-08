@@ -2,8 +2,7 @@
 
 A TUI file browser extension for [pi](https://github.com/earendil-works/pi-coding-agent). Navigate directories, open files for editing, and switch workspace sessions — all from within pi.
 
-<!-- gif placeholder -->
-![demo](./demo.gif)
+![demo](https://github.com/user-attachments/assets/d85c538e-0594-4a70-9de0-666294e41d7b)
 
 ## Install
 
