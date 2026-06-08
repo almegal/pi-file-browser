@@ -161,6 +161,14 @@ export class FileBrowserApp {
     const sm = SessionManager.create(directory);
     sm.appendCustomEntry('file-browser-workspace', { directory });
 
+    // Force-write session file to disk before switchSession.
+    // Without this, SessionManager keeps entries in memory (flushed=false) until an
+    // assistant message arrives, so switchSession -> SessionManager.open() would
+    // find an empty/missing file and fall back to process.cwd() instead of the
+    // intended directory.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (sm as any)._rewriteFile();
+
     const sessionFile = sm.getSessionFile();
     if (!sessionFile) {
       ctx.ui.notify('Failed to create session file', 'error');
