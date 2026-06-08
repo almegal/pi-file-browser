@@ -67,10 +67,21 @@ export class FileBrowserApp {
 
         // Component closed with a final action — handle it
         if (result.action === 'edit_file') {
-          // Delegate file editing to pi's built-in /edit or similar mechanism
-          ctx.ui.notify('Opening file for editing: ' + this.shortenPath(result.filePath), 'info');
-          // In pi, we can use the edit tool or simply notify the user.
-          // The browser overlay is already closed; the user can use pi's editing capabilities.
+          // Open pi's built-in multi-line editor with file content
+          try {
+            const content = await this.fsProvider.readFile(result.filePath);
+            const edited = await ctx.ui.editor(
+              'Edit: ' + this.shortenPath(result.filePath),
+              content,
+            );
+            if (edited !== undefined) {
+              // User saved — write back
+              await this.fsProvider.writeFile(result.filePath, edited);
+              ctx.ui.notify('Saved: ' + this.shortenPath(result.filePath), 'info');
+            }
+          } catch (err) {
+            ctx.ui.notify('Failed to open file: ' + String(err), 'error');
+          }
           return;
         } else if (result.action === 'new_session') {
           await this.createNewSession(result.directory, ctx);

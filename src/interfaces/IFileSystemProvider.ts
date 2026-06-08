@@ -27,4 +27,7 @@ export interface IFileSystemProvider {
 
   /** Read file content as UTF-8 string */
   readFile(filePath: string): Promise<string>;
+
+  /** Write content to a file as UTF-8 */
+  writeFile(filePath: string, content: string): Promise<void>;
 }

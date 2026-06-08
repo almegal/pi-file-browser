@@ -102,4 +102,8 @@ export class FileSystemProvider implements IFileSystemProvider {
     const buffer = await fs.readFile(filePath);
     return buffer.toString('utf-8');
   }
+
+  async writeFile(filePath: string, content: string): Promise<void> {
+    await fs.writeFile(filePath, content, 'utf-8');
+  }
 }
