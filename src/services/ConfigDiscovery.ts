@@ -1,8 +1,3 @@
-// ============================================================
-// ConfigDiscovery — discovers local config files in a directory
-// (checks for AGENTS.md, CLAUDE.md, .pi/, .agents/ configs)
-// ============================================================
-
 import { IFileSystemProvider } from '../interfaces/IFileSystemProvider';
 import { DirectoryConfigInfo } from '../types';
 import path from 'path';
@@ -25,9 +20,7 @@ export class ConfigDiscovery {
       })),
     );
 
-    const configItems = results
-      .filter((r) => r.exists)
-      .map((r) => r.name);
+    const configItems = results.filter((r) => r.exists).map((r) => r.name);
 
     const hasAgentsMd = results.find((r) => r.name === 'AGENTS.md')!.exists;
     const hasClaudeMd = results.find((r) => r.name === 'CLAUDE.md')!.exists;
@@ -38,14 +31,6 @@ export class ConfigDiscovery {
       ? `Config: ${configItems.join(', ')}`
       : 'No local config';
 
-    return {
-      directory,
-      hasAgentsMd,
-      hasClaudeMd,
-      hasPiDir,
-      hasAgentsDir,
-      configItems,
-      description,
-    };
+    return { directory, hasAgentsMd, hasClaudeMd, hasPiDir, hasAgentsDir, configItems, description };
   }
 }

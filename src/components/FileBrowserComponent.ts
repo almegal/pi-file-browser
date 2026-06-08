@@ -1,38 +1,21 @@
-// ============================================================
-// FileBrowserComponent — pi-native TUI component
-// (implements Component interface from @earendil-works/pi-tui)
-// Supports three modes: browsing, loading, selecting
-// Enter on file delegates to pi editor, then reopens browser
-// Single Responsibility: render + input handling for the file browser
-// ============================================================
-
 import type { Component } from '@earendil-works/pi-tui';
 import { truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
 import { IPanelModel } from '../interfaces/IPanelModel';
 import { IInputHandler } from '../interfaces/IInputHandler';
 import { Direction, Action, BrowserResult, BrowserMode, SelectionData, DiscoverOptionsFn, FileEntry } from '../types';
 
-// Box-drawing characters for the border
-const TL = '\u256D';
-const TR = '\u256E';
-const BL = '\u2570';
-const BR = '\u256F';
-const H = '\u2500';
-const V = '\u2502';
+const TL = '\u256D', TR = '\u256E', BL = '\u2570', BR = '\u256F', H = '\u2500', V = '\u2502';
 
 export class FileBrowserComponent implements Component {
-  // Render cache
   private cachedLines: string[] = [];
   private cachedWidth = 0;
   private version = 0;
   private cachedVersion = -1;
 
-  // Mode state
   private mode: BrowserMode = 'browsing';
   private selectionData: SelectionData | null = null;
   private selectionIndex: number = 0;
 
-  // Result callback and async discovery
   private readonly done: (result: BrowserResult) => void;
   private readonly discoverOptions: DiscoverOptionsFn;
 
@@ -47,16 +30,12 @@ export class FileBrowserComponent implements Component {
     this.discoverOptions = discoverOptions;
   }
 
-  // ---- Component interface ----
-
   handleInput(data: string): void {
     const input = this.inputHandler.handleKey(data);
     if (input === null) return;
 
-    // In loading mode, ignore all input
     if (this.mode === 'loading') return;
 
-    // In selecting mode, handle option navigation
     if (this.mode === 'selecting') {
       this.handleSelectingInput(input);
       this.version++;
@@ -64,38 +43,26 @@ export class FileBrowserComponent implements Component {
       return;
     }
 
-    // In browsing mode
     if (input === Direction.Up) {
       this.panel.moveUp();
     } else if (input === Direction.Down) {
       this.panel.moveDown();
     } else if (input === Direction.Left) {
-      this.panel.goUp().then(() => {
-        this.version++;
-        this.tui.requestRender();
-      });
+      this.panel.goUp().then(() => { this.version++; this.tui.requestRender(); });
       return;
     } else if (input === Direction.Right) {
-      // Right arrow: browse into directory (navigational)
-      this.panel.goInto().then(() => {
-        this.version++;
-        this.tui.requestRender();
-      });
+      this.panel.goInto().then(() => { this.version++; this.tui.requestRender(); });
       return;
     } else if (input === Action.Enter) {
       const selected = this.panel.getSelectedEntry();
       if (!selected) return;
 
       if (selected.isDirectory) {
-        // Enter on directory: select for workspace switch
         const selectedPath = selected.path;
-
-        // Switch to loading mode immediately
         this.mode = 'loading';
         this.version++;
         this.tui.requestRender();
 
-        // Discover session options (no panel navigation)
         this.discoverOptions(selectedPath).then((data) => {
           this.selectionData = data;
           this.selectionIndex = 0;
@@ -103,14 +70,12 @@ export class FileBrowserComponent implements Component {
           this.version++;
           this.tui.requestRender();
         }).catch(() => {
-          // Discovery failed, go back to browsing
           this.mode = 'browsing';
           this.version++;
           this.tui.requestRender();
         });
         return;
       } else {
-        // Enter on file: open in pi editor
         this.done({ action: 'edit_file', filePath: selected.path });
         return;
       }
@@ -133,35 +98,22 @@ export class FileBrowserComponent implements Component {
       return this.cachedLines;
     }
 
-    const innerWidth = width - 2; // subtract left+right border
-    if (innerWidth < 10) {
-      const line = truncateToWidth('Browser too narrow', width);
-      return [line];
-    }
+    const innerWidth = width - 2;
+    if (innerWidth < 10) return [truncateToWidth('Browser too narrow', width)];
 
     let lines: string[];
-
     switch (this.mode) {
-      case 'browsing':
-        lines = this.renderBrowsing(innerWidth);
-        break;
-      case 'loading':
-        lines = this.renderLoading(innerWidth);
-        break;
-      case 'selecting':
-        lines = this.renderSelecting(innerWidth);
-        break;
+      case 'browsing': lines = this.renderBrowsing(innerWidth); break;
+      case 'loading': lines = this.renderLoading(innerWidth); break;
+      case 'selecting': lines = this.renderSelecting(innerWidth); break;
     }
 
-    // Add border
     const bordered = this.addBorder(lines, innerWidth);
     this.cachedLines = bordered;
     this.cachedWidth = width;
     this.cachedVersion = this.version;
     return bordered;
   }
-
-  // ---- Input handling for selecting mode ----
 
   private handleSelectingInput(input: Direction | Action): void {
     const data = this.selectionData;
@@ -174,227 +126,117 @@ export class FileBrowserComponent implements Component {
     } else if (input === Action.Enter) {
       const option = data.options[this.selectionIndex];
       if (!option) return;
-
-      if (option.isBack) {
-        // Go back to browsing (already inside the directory)
-        this.mode = 'browsing';
-        this.selectionData = null;
-        return;
-      }
-
-      if (option.isNewSession) {
-        this.done({ action: 'new_session', directory: data.directory });
-        return;
-      }
-
-      if (option.sessionPath) {
-        this.done({ action: 'resume_session', directory: data.directory, sessionPath: option.sessionPath });
-        return;
-      }
-    } else if (input === Action.Escape) {
-      // ESC in selecting: go back to browsing (already inside the directory)
+      if (option.isBack) { this.mode = 'browsing'; this.selectionData = null; return; }
+      if (option.isNewSession) { this.done({ action: 'new_session', directory: data.directory }); return; }
+      if (option.sessionPath) { this.done({ action: 'resume_session', directory: data.directory, sessionPath: option.sessionPath }); return; }
+    } else if (input === Action.Escape || input === Direction.Left) {
       this.mode = 'browsing';
       this.selectionData = null;
-      return;
-    } else if (input === Direction.Left) {
-      this.mode = 'browsing';
-      this.selectionData = null;
-      return;
     }
   }
 
-  // ---- Rendering modes ----
-
-  private renderBrowsing(innerWidth: number): string[] {
+  private renderBrowsing(w: number): string[] {
     const lines: string[] = [];
+    lines.push('\u2500'.repeat(w));
 
-    // Header separator (path is in the border)
-    lines.push('\u2500'.repeat(innerWidth));
+    const max = 16;
+    const entries = this.renderPanelEntries(this.panel.entries, this.panel.selectedIndex, w, max);
+    for (let i = 0; i < max; i++) lines.push(entries[i] ?? ' '.repeat(w));
 
-    // File entries
-    const maxEntries = this.getMaxBrowsingEntries();
-    const entries = this.renderPanelEntries(
-      this.panel.entries,
-      this.panel.selectedIndex,
-      innerWidth,
-      maxEntries,
-    );
+    const status = truncateToWidth(this.renderStatusBar(), w);
+    lines.push(status + ' '.repeat(Math.max(0, w - visibleWidth(status))));
 
-    for (let i = 0; i < maxEntries; i++) {
-      lines.push(entries[i] ?? ' '.repeat(innerWidth));
-    }
-
-    // Status bar
-    const status = truncateToWidth(this.renderStatusBar(), innerWidth);
-    lines.push(status + ' '.repeat(Math.max(0, innerWidth - visibleWidth(status))));
-
-    // Help hints
-    const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  Esc', innerWidth);
-    lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, innerWidth - visibleWidth(hints))) + '\x1b[22m');
-
+    const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  Esc', w);
+    lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, w - visibleWidth(hints))) + '\x1b[22m');
     return lines;
   }
 
-  private renderLoading(innerWidth: number): string[] {
+  private renderLoading(w: number): string[] {
     const lines: string[] = [];
-
-    lines.push('\u2500'.repeat(innerWidth));
-
-    // Center the loading message
-    const loadingMsg = '\u23F3 Discovering sessions...';
-    const padded = ' '.repeat(Math.max(0, Math.floor((innerWidth - visibleWidth(loadingMsg)) / 2)))
-      + truncateToWidth(loadingMsg, innerWidth);
-    lines.push(padded + ' '.repeat(Math.max(0, innerWidth - visibleWidth(padded))));
-
-    // Fill remaining space
-    const maxEntries = this.getMaxBrowsingEntries() + 2; // +2 for status + hints
-    for (let i = 1; i < maxEntries; i++) {
-      lines.push(' '.repeat(innerWidth));
-    }
-
+    lines.push('\u2500'.repeat(w));
+    const msg = '\u23F3 Discovering sessions...';
+    const padded = ' '.repeat(Math.max(0, Math.floor((w - visibleWidth(msg)) / 2))) + truncateToWidth(msg, w);
+    lines.push(padded + ' '.repeat(Math.max(0, w - visibleWidth(padded))));
+    for (let i = 1; i < 18; i++) lines.push(' '.repeat(w));
     return lines;
   }
 
-  private renderSelecting(innerWidth: number): string[] {
+  private renderSelecting(w: number): string[] {
     const data = this.selectionData;
-    if (!data) return this.renderLoading(innerWidth);
+    if (!data) return this.renderLoading(w);
 
     const lines: string[] = [];
+    const configLine = truncateToWidth(data.configDescription, w);
+    lines.push('\x1b[2m' + configLine + ' '.repeat(Math.max(0, w - visibleWidth(configLine))) + '\x1b[22m');
+    lines.push('\u2500'.repeat(w));
 
-    // Config info line
-    const configLine = truncateToWidth(data.configDescription, innerWidth);
-    lines.push('\x1b[2m' + configLine + ' '.repeat(Math.max(0, innerWidth - visibleWidth(configLine))) + '\x1b[22m');
-
-    // Separator
-    lines.push('\u2500'.repeat(innerWidth));
-
-    // Options
-    const maxOptionRows = this.getMaxBrowsingEntries() - 2; // -2 for config + separator
-
-    for (let i = 0; i < maxOptionRows; i++) {
-      if (i >= data.options.length) {
-        lines.push(' '.repeat(innerWidth));
-        continue;
-      }
-
+    const maxRows = 14;
+    for (let i = 0; i < maxRows; i++) {
+      if (i >= data.options.length) { lines.push(' '.repeat(w)); continue; }
       const option = data.options[i];
       const isSelected = i === this.selectionIndex;
-
-      let entryText = ' ' + option.label;
-
-      entryText = truncateToWidth(entryText, innerWidth);
-      const entryVisibleWidth = visibleWidth(entryText);
-      const padding = Math.max(0, innerWidth - entryVisibleWidth);
-      entryText += ' '.repeat(padding);
-
-      if (isSelected) {
-        entryText = '\x1b[7m' + entryText + '\x1b[27m';
-      }
-      lines.push(entryText);
+      let text = truncateToWidth(' ' + option.label, w);
+      text += ' '.repeat(Math.max(0, w - visibleWidth(text)));
+      if (isSelected) text = '\x1b[7m' + text + '\x1b[27m';
+      lines.push(text);
     }
 
-    // Status bar
-    const status = truncateToWidth('\x1b[1mSelect action\x1b[22m', innerWidth);
-    lines.push(status + ' '.repeat(Math.max(0, innerWidth - visibleWidth(status))));
+    const status = truncateToWidth('\x1b[1mSelect action\x1b[22m', w);
+    lines.push(status + ' '.repeat(Math.max(0, w - visibleWidth(status))));
 
-    // Help hints
-    const hints = truncateToWidth('\u21B5=confirm  \u2191\u2193=select  Esc/\u2190=back', innerWidth);
-    lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, innerWidth - visibleWidth(hints))) + '\x1b[22m');
-
+    const hints = truncateToWidth('\u21B5=confirm  \u2191\u2193=select  Esc/\u2190=back', w);
+    lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, w - visibleWidth(hints))) + '\x1b[22m');
     return lines;
   }
-
-  // ---- Border rendering ----
 
   private addBorder(innerLines: string[], innerWidth: number): string[] {
     const result: string[] = [];
-
-    // Top border with path header
     const pathLabel = this.mode === 'selecting' && this.selectionData
       ? ' Open: ' + this.selectionData.directory + ' '
       : ' ' + this.panel.currentPath + ' ';
-    const pathHeader = truncateToWidth(pathLabel, innerWidth);
-    const pathPad = innerWidth - visibleWidth(pathHeader);
-    result.push(TL + H + '\x1b[1m' + pathHeader + ' '.repeat(pathPad) + '\x1b[22m' + H + TR);
-
-    for (const line of innerLines) {
-      result.push(V + line + V);
-    }
-
-    // Bottom border
+    const header = truncateToWidth(pathLabel, innerWidth);
+    const pad = innerWidth - visibleWidth(header);
+    result.push(TL + H + '\x1b[1m' + header + ' '.repeat(pad) + '\x1b[22m' + H + TR);
+    for (const line of innerLines) result.push(V + line + V);
     result.push(BL + H.repeat(innerWidth) + BR);
-
     return result;
   }
 
-  // ---- Shared rendering helpers ----
-
-  private getMaxBrowsingEntries(): number {
-    return 16;
-  }
-
   private renderPanelEntries(
-    entries: ReadonlyArray<FileEntry>,
-    selectedIndex: number,
-    innerWidth: number,
-    maxVisible: number,
+    entries: ReadonlyArray<FileEntry>, selectedIndex: number, w: number, maxVisible: number,
   ): string[] {
     const lines: string[] = [];
-    const scrollOffset = this.calculateScrollOffset(entries.length, selectedIndex, maxVisible);
-
-    for (let displayIdx = 0; displayIdx < maxVisible; displayIdx++) {
-      const entryIdx = displayIdx + scrollOffset;
-      if (entryIdx >= entries.length) {
-        lines.push(' '.repeat(innerWidth));
-        continue;
-      }
-
-      const entry = entries[entryIdx];
-      const isSelected = entryIdx === selectedIndex;
+    const offset = this.calculateScrollOffset(entries.length, selectedIndex, maxVisible);
+    for (let i = 0; i < maxVisible; i++) {
+      const idx = i + offset;
+      if (idx >= entries.length) { lines.push(' '.repeat(w)); continue; }
+      const entry = entries[idx];
       const icon = entry.isDirectory ? '\u{1F4C1}' : '\u{1F4C4}';
       const suffix = entry.isDirectory ? '/' : '';
-
-      let entryText = ' ' + icon + ' ' + entry.name + suffix;
-      entryText = truncateToWidth(entryText, innerWidth);
-      const entryVisibleWidth = visibleWidth(entryText);
-      const padding = Math.max(0, innerWidth - entryVisibleWidth);
-      entryText += ' '.repeat(padding);
-
-      if (isSelected) {
-        entryText = '\x1b[7m' + entryText + '\x1b[27m';
-      } else if (entry.isDirectory) {
-        entryText = '\x1b[1m' + entryText + '\x1b[22m';
-      }
-
-      lines.push(entryText);
+      let text = truncateToWidth(' ' + icon + ' ' + entry.name + suffix, w);
+      text += ' '.repeat(Math.max(0, w - visibleWidth(text)));
+      if (idx === selectedIndex) text = '\x1b[7m' + text + '\x1b[27m]';
+      else if (entry.isDirectory) text = '\x1b[1m' + text + '\x1b[22m';
+      lines.push(text);
     }
-
     return lines;
   }
 
-  private calculateScrollOffset(
-    totalEntries: number,
-    selectedIndex: number,
-    maxVisible: number,
-  ): number {
-    if (totalEntries <= maxVisible) return 0;
-    const halfVisible = Math.floor(maxVisible / 2);
-    const offset = Math.max(0, selectedIndex - halfVisible);
-    const maxOffset = Math.max(0, totalEntries - maxVisible);
-    return Math.min(offset, maxOffset);
+  private calculateScrollOffset(total: number, selected: number, maxVisible: number): number {
+    if (total <= maxVisible) return 0;
+    const half = Math.floor(maxVisible / 2);
+    return Math.min(Math.max(0, selected - half), Math.max(0, total - maxVisible));
   }
 
   private renderStatusBar(): string {
-    const selected = this.panel.entries[this.panel.selectedIndex];
-
-    let entryInfo = '(empty)';
-    if (selected) {
-      const type = selected.isDirectory ? 'DIR' : 'FILE';
-      const size = selected.isDirectory ? '' : ' ' + formatSize(selected.size);
-      entryInfo = type + ' ' + selected.name + size;
+    const s = this.panel.entries[this.panel.selectedIndex];
+    let info = '(empty)';
+    if (s) {
+      const type = s.isDirectory ? 'DIR' : 'FILE';
+      const size = s.isDirectory ? '' : ' ' + formatSize(s.size);
+      info = type + ' ' + s.name + size;
     }
-
-    return ' \x1b[1m' + entryInfo + '\x1b[22m';
+    return ' \x1b[1m' + info + '\x1b[22m';
   }
 }
 

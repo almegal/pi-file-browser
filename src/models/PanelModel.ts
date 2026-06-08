@@ -1,8 +1,3 @@
-// ============================================================
-// PanelModel — state manager for a single file panel
-// (Single Responsibility: state management only)
-// ============================================================
-
 import { IPanelModel } from '../interfaces/IPanelModel';
 import { IFileSystemProvider } from '../interfaces/IFileSystemProvider';
 import { FileEntry } from '../types';
@@ -19,17 +14,9 @@ export class PanelModel implements IPanelModel {
     this._currentPath = initialPath;
   }
 
-  get currentPath(): string {
-    return this._currentPath;
-  }
-
-  get selectedIndex(): number {
-    return this._selectedIndex;
-  }
-
-  get entries(): ReadonlyArray<FileEntry> {
-    return this._entries;
-  }
+  get currentPath(): string { return this._currentPath; }
+  get selectedIndex(): number { return this._selectedIndex; }
+  get entries(): ReadonlyArray<FileEntry> { return this._entries; }
 
   getSelectedEntry(): FileEntry | undefined {
     if (this._entries.length === 0) return undefined;
@@ -52,15 +39,11 @@ export class PanelModel implements IPanelModel {
   }
 
   moveUp(): void {
-    if (this._selectedIndex > 0) {
-      this._selectedIndex--;
-    }
+    if (this._selectedIndex > 0) this._selectedIndex--;
   }
 
   moveDown(): void {
-    if (this._selectedIndex < this._entries.length - 1) {
-      this._selectedIndex++;
-    }
+    if (this._selectedIndex < this._entries.length - 1) this._selectedIndex++;
   }
 
   async goUp(): Promise<void> {
@@ -72,10 +55,8 @@ export class PanelModel implements IPanelModel {
 
   async goInto(): Promise<boolean> {
     if (this._entries.length === 0) return false;
-
     const selected = this._entries[this._selectedIndex];
     if (!selected) return false;
-
     if (selected.isDirectory) {
       await this.navigateTo(selected.path);
       return true;
