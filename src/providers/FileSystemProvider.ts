@@ -12,6 +12,7 @@ import { FileEntry } from '../types';
 export class FileSystemProvider implements IFileSystemProvider {
   async listDirectory(dirPath: string): Promise<FileEntry[]> {
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
+
     // Sort: directories first, then files, alphabetical within each group
     const dirs: FileEntry[] = [];
     const files: FileEntry[] = [];

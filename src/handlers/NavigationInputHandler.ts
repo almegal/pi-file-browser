@@ -2,35 +2,48 @@
 // NavigationInputHandler — maps keys to directions/actions
 // (Single Responsibility: input mapping only)
 // (Open/Closed: new key bindings can be added without modifying consumers)
+// Uses pi-tui's matchesKey() for robust key detection
 // ============================================================
 
+import { matchesKey, Key } from '@earendil-works/pi-tui';
 import { IInputHandler } from '../interfaces/IInputHandler';
 import { Direction, Action } from '../types';
 
-/** Key mapping type */
-type DirectionOrAction = Direction | Action;
-
-/** Key mapping configuration — easily extensible */
-const KEY_MAP = new Map<string, DirectionOrAction>([
-  // Arrow keys and movement
-  ['up', Direction.Up],
-  ['down', Direction.Down],
-  ['left', Direction.Left],
-  ['right', Direction.Right],
-  ['k', Direction.Up],
-  ['j', Direction.Down],
-  ['h', Direction.Left],
-  ['l', Direction.Right],
-
-  // Actions
-  ['enter', Action.Enter],
-  ['escape', Action.Escape],
-  ['q', Action.Escape],
-  ['tab', Action.Tab],
-]);
+/** Key binding configuration */
+interface KeyBinding {
+  readonly match: (data: string) => boolean;
+  readonly result: Direction | Action;
+}
 
 export class NavigationInputHandler implements IInputHandler {
-  handleKey(key: string, _ch?: string): Direction | Action | null {
-    return KEY_MAP.get(key) ?? null;
+  private readonly bindings: ReadonlyArray<KeyBinding>;
+
+  constructor() {
+    this.bindings = [
+      // Arrow keys
+      { match: (d) => matchesKey(d, Key.up), result: Direction.Up },
+      { match: (d) => matchesKey(d, Key.down), result: Direction.Down },
+      { match: (d) => matchesKey(d, Key.left), result: Direction.Left },
+      { match: (d) => matchesKey(d, Key.right), result: Direction.Right },
+      // Vim-style
+      { match: (d) => d === 'k', result: Direction.Up },
+      { match: (d) => d === 'j', result: Direction.Down },
+      { match: (d) => d === 'h', result: Direction.Left },
+      { match: (d) => d === 'l', result: Direction.Right },
+      // Actions
+      { match: (d) => matchesKey(d, Key.enter), result: Action.Enter },
+      { match: (d) => matchesKey(d, Key.escape), result: Action.Escape },
+      { match: (d) => d === 'q', result: Action.Escape },
+      { match: (d) => matchesKey(d, Key.tab), result: Action.Tab },
+    ];
+  }
+
+  handleKey(data: string): Direction | Action | null {
+    for (const binding of this.bindings) {
+      if (binding.match(data)) {
+        return binding.result;
+      }
+    }
+    return null;
   }
 }

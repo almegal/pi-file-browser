@@ -1,6 +1,6 @@
 // ============================================================
 // IFileSystemProvider — abstraction over file system operations
-// (Dependency Inversion Principle: high-level modules depend on this,
+// (Dependency Inversion: high-level modules depend on this,
 //  not on concrete fs calls)
 // ============================================================
 

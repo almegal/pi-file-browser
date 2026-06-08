@@ -1,20 +1,16 @@
 {
   "name": "pi-file-browser",
   "version": "1.0.0",
-  "description": "Total Commander-like TUI file browser",
+  "description": "Total Commander-like TUI file browser for pi",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "start": "node dist/index.js"
   },
-  "dependencies": {
-    "blessed": "^0.1.81"
-  },
+  "piExtension": true,
+  "dependencies": {},
   "devDependencies": {
-    "@types/blessed": "^0.1.25",
     "@types/node": "^20.14.0",
-    "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
   }
 }
