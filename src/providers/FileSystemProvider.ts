@@ -76,6 +76,15 @@ export class FileSystemProvider implements IFileSystemProvider {
     }
   }
 
+  async exists(pathStr: string): Promise<boolean> {
+    try {
+      await fs.access(pathStr);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   getParentPath(dirPath: string): string {
     const parent = path.dirname(dirPath);
     return parent === dirPath ? dirPath : parent;

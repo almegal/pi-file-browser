@@ -13,6 +13,9 @@ export interface IFileSystemProvider {
   /** Check if a path exists and is a directory */
   isDirectory(path: string): Promise<boolean>;
 
+  /** Check if a path exists (file or directory) */
+  exists(path: string): Promise<boolean>;
+
   /** Get the parent directory of a path */
   getParentPath(path: string): string;
 

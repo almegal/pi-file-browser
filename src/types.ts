@@ -32,3 +32,47 @@ export interface NavigationResult {
   readonly newPath?: string;
   readonly error?: string;
 }
+
+/** Result returned when the file browser closes */
+export type BrowserResult =
+  | { action: 'cancel' }
+  | { action: 'select_directory'; path: string };
+
+/** Information about local config files in a directory */
+export interface DirectoryConfigInfo {
+  readonly directory: string;
+  readonly hasAgentsMd: boolean;
+  readonly hasClaudeMd: boolean;
+  readonly hasPiDir: boolean;
+  readonly hasAgentsDir: boolean;
+  readonly configItems: readonly string[];
+  readonly description: string;
+}
+
+/** Information about sessions for a directory */
+export interface DirectorySessionInfo {
+  readonly directory: string;
+  readonly sessions: readonly SessionSummary[];
+  readonly hasExistingSession: boolean;
+  readonly mostRecentSession?: SessionSummary;
+}
+
+/** Simplified session info for display */
+export interface SessionSummary {
+  readonly path: string;
+  readonly name?: string;
+  readonly modified: Date;
+  readonly firstMessage: string;
+  readonly messageCount: number;
+}
+
+/** Options shown when selecting a directory */
+export interface DirectoryOption {
+  readonly id: string;
+  readonly label: string;
+  readonly description: string;
+  readonly sessionPath?: string;
+  readonly isNewSession?: boolean;
+  readonly isBrowse?: boolean;
+  readonly isCancel?: boolean;
+}

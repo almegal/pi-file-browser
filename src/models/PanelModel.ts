@@ -31,6 +31,11 @@ export class PanelModel implements IPanelModel {
     return this._entries;
   }
 
+  getSelectedEntry(): FileEntry | undefined {
+    if (this._entries.length === 0) return undefined;
+    return this._entries[this._selectedIndex];
+  }
+
   async navigateTo(path: string): Promise<void> {
     const isDir = await this.fsProvider.isDirectory(path);
     if (!isDir) {

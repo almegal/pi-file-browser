@@ -7,7 +7,7 @@ pi-file-browser/
 ├── src/
 │   ├── index.ts              # Extension entry point (Composition Root)
 │   ├── app/
-│   │   └── FileBrowserApp.ts # Orchestrator — registers /files command
+│   │   └── FileBrowserApp.ts # Orchestrator — registers /files command, handles session switching
 │   ├── components/
 │   │   └── FileBrowserComponent.ts # TUI rendering + input handling
 │   ├── handlers/
@@ -20,6 +20,8 @@ pi-file-browser/
 │   │   └── PanelModel.ts       # Panel state (navigation, selection)
 │   ├── providers/
 │   │   └── FileSystemProvider.ts # Node.js fs implementation
+│   └── services/
+│       └── ConfigDiscovery.ts   # Detects AGENTS.md, .pi/, .agents/ configs
 │   └── types.ts                # Domain enums & interfaces
 ├── dist/                       # Compiled output (gitignored)
 ├── package.json
@@ -27,6 +29,22 @@ pi-file-browser/
 ```
 
 Architecture follows **Single Responsibility** per file and **Composition Root** for DI. Interfaces (`I*`) define contracts; models and providers implement them. The component never imports Node APIs directly — filesystem access goes through `IFileSystemProvider`.
+
+## Feature: Directory Workspace Switching
+
+When the user presses **Enter** on a directory in the file browser:
+1. Browser closes and returns the selected directory path
+2. Existing pi sessions for that directory are discovered via `SessionManager.list()`
+3. Local config files (AGENTS.md, .pi/, etc.) are detected
+4. A selection dialog shows options:
+   - 🆕 **New session** — creates a new pi session with that directory as cwd
+   - 🔄 **Resume session** — switches to an existing session (shown for recent sessions)
+   - 📂 **Browse inside** — reopens the file browser inside the directory
+   - ↩ **Cancel** — stay in current session
+
+When switching to a directory, pi automatically discovers and loads local configs (AGENTS.md, .pi/, .agents/) from that directory's cwd.
+
+**Key arrow**: Enter = select directory for workspace, → = navigate into (browse).
 
 ## Build, Test, and Development Commands
 

@@ -30,6 +30,7 @@ export class FileBrowserComponent implements Component {
     private readonly inputHandler: IInputHandler,
     private readonly tui: { requestRender: () => void },
     private readonly onClose: () => void,
+    private readonly onSelect: (path: string) => void,
   ) {}
 
   // ---- Component interface ----
@@ -49,16 +50,20 @@ export class FileBrowserComponent implements Component {
       });
       return;
     } else if (input === Direction.Right) {
+      // Right arrow: browse into directory (navigational)
       this.panel.goInto().then(() => {
         this.version++;
         this.tui.requestRender();
       });
       return;
     } else if (input === Action.Enter) {
-      this.panel.goInto().then(() => {
-        this.version++;
-        this.tui.requestRender();
-      });
+      // Enter: select directory for workspace switch
+      const selected = this.panel.getSelectedEntry();
+      if (selected && selected.isDirectory) {
+        this.onSelect(selected.path);
+        return;
+      }
+      // Enter on non-directory: do nothing
       return;
     } else if (input === Action.Escape) {
       this.onClose();
@@ -118,6 +123,11 @@ export class FileBrowserComponent implements Component {
     const statusPad = innerWidth - visibleWidth(status);
     lines.push(V + status + ' '.repeat(statusPad) + V);
 
+    // Help hints bar
+    const hints = truncateToWidth(' ↵=Open →=Browse ↑↓← Esc', innerWidth);
+    const hintsPad = innerWidth - visibleWidth(hints);
+    lines.push(V + '\x1b[2m' + hints + ' '.repeat(hintsPad) + '\x1b[22m' + V);
+
     // Bottom border
     lines.push(BL + H.repeat(innerWidth) + BR);
 
@@ -130,7 +140,7 @@ export class FileBrowserComponent implements Component {
   // ---- Private rendering helpers ----
 
   private getMaxEntries(): number {
-    return 20;
+    return 18;
   }
 
   private renderPanelEntries(
@@ -196,8 +206,7 @@ export class FileBrowserComponent implements Component {
       entryInfo = `${type} ${selected.name}${size}`;
     }
 
-    return ` \x1b[1m${entryInfo}\x1b[22m ` +
-      `\x1b[2m│ ↑↓←→ Enter Esc\x1b[22m`;
+    return ` \x1b[1m${entryInfo}\x1b[22m`;
   }
 }
 

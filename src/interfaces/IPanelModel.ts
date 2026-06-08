@@ -15,6 +15,9 @@ export interface IPanelModel {
   /** File entries in current directory */
   readonly entries: ReadonlyArray<FileEntry>;
 
+  /** Get the currently selected entry, if any */
+  getSelectedEntry(): FileEntry | undefined;
+
   /** Navigate to a new directory */
   navigateTo(path: string): Promise<void>;
 
