@@ -7,14 +7,14 @@ A TUI file browser extension for [pi](https://github.com/earendil-works/pi-codin
 
 ## Install
 
-```sh
-pi install /path/to/pi-file-browser
+```
+pi install npm:@almegal/pi-file-browser
 ```
 
 Or from this repo:
 
 ```sh
-pi install git:github.com/user/pi-file-browser
+pi install git:github.com/almegal/pi-file-browser
 ```
 
 After install, run `/reload` in pi.
