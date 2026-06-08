@@ -82,7 +82,8 @@ export class FileBrowserComponent implements Component {
       });
       return;
     } else if (input === Action.Enter) {
-      // Enter: select directory for workspace switch
+      // Enter: select directory for workspace switch — do NOT navigate into it,
+      // so that "Back" returns the cursor to the same position.
       const selected = this.panel.getSelectedEntry();
       if (selected && selected.isDirectory) {
         const selectedPath = selected.path;
@@ -92,26 +93,16 @@ export class FileBrowserComponent implements Component {
         this.version++;
         this.tui.requestRender();
 
-        // Navigate panel into the directory (for later browsing)
-        // and discover session options in parallel
-        this.panel.goInto().then(async (navigated) => {
-          if (!navigated) {
-            // Navigation failed, go back to browsing
-            this.mode = 'browsing';
-            this.version++;
-            this.tui.requestRender();
-            return;
-          }
-
-          try {
-            const data = await this.discoverOptions(selectedPath);
-            this.selectionData = data;
-            this.selectionIndex = 0;
-            this.mode = 'selecting';
-          } catch {
-            // Discovery failed, go back to browsing (inside directory)
-            this.mode = 'browsing';
-          }
+        // Discover session options (no panel navigation)
+        this.discoverOptions(selectedPath).then((data) => {
+          this.selectionData = data;
+          this.selectionIndex = 0;
+          this.mode = 'selecting';
+          this.version++;
+          this.tui.requestRender();
+        }).catch(() => {
+          // Discovery failed, go back to browsing
+          this.mode = 'browsing';
           this.version++;
           this.tui.requestRender();
         });
@@ -234,7 +225,7 @@ export class FileBrowserComponent implements Component {
     lines.push(status + ' '.repeat(Math.max(0, innerWidth - visibleWidth(status))));
 
     // Help hints
-    const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  Esc', innerWidth);
+    const hints = truncateToWidth('\u21B5=select  \u2192=browse  \u2191\u2193\u2190  Esc', innerWidth);
     lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, innerWidth - visibleWidth(hints))) + '\x1b[22m');
 
     return lines;
