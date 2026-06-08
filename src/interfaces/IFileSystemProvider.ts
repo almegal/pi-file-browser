@@ -24,4 +24,7 @@ export interface IFileSystemProvider {
 
   /** Get the home directory */
   getHomeDirectory(): string;
+
+  /** Read file content as UTF-8 string */
+  readFile(filePath: string): Promise<string>;
 }

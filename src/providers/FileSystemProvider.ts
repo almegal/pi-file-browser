@@ -97,4 +97,9 @@ export class FileSystemProvider implements IFileSystemProvider {
   getHomeDirectory(): string {
     return os.homedir();
   }
+
+  async readFile(filePath: string): Promise<string> {
+    const buffer = await fs.readFile(filePath);
+    return buffer.toString('utf-8');
+  }
 }

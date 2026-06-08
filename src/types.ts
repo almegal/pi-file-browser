@@ -24,6 +24,9 @@ export enum Action {
   Enter = 'ENTER',
   Escape = 'ESCAPE',
   Tab = 'TAB',
+  PageUp = 'PAGE_UP',
+  PageDown = 'PAGE_DOWN',
+  Edit = 'EDIT',
 }
 
 /** Result of a navigation attempt */
@@ -37,7 +40,8 @@ export interface NavigationResult {
 export type BrowserResult =
   | { action: 'cancel' }
   | { action: 'new_session'; directory: string }
-  | { action: 'resume_session'; directory: string; sessionPath: string };
+  | { action: 'resume_session'; directory: string; sessionPath: string }
+  | { action: 'edit_file'; filePath: string };
 
 /** Information about local config files in a directory */
 export interface DirectoryConfigInfo {
@@ -88,4 +92,4 @@ export interface SelectionData {
 export type DiscoverOptionsFn = (directory: string) => Promise<SelectionData>;
 
 /** Component mode */
-export type BrowserMode = 'browsing' | 'loading' | 'selecting';
+export type BrowserMode = 'browsing' | 'loading' | 'selecting' | 'viewing';

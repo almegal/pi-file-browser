@@ -42,7 +42,7 @@ export class FileBrowserApp {
         const panel = new PanelModel(this.fsProvider, currentPath);
         await panel.refresh();
 
-        // Single overlay — the component handles browsing, loading, and selection modes
+        // Single overlay — the component handles browsing, loading, selection, and viewing modes
         const result = await ctx.ui.custom<BrowserResult>(
           (tui, _theme, _keybindings, done) => {
             const component = new FileBrowserComponent(
@@ -51,6 +51,7 @@ export class FileBrowserApp {
               tui,
               done,
               (directory) => this.discoverOptions(directory),
+              (filePath) => this.fsProvider.readFile(filePath),
             );
             return component;
           },
@@ -65,7 +66,13 @@ export class FileBrowserApp {
         );
 
         // Component closed with a final action — handle it
-        if (result.action === 'new_session') {
+        if (result.action === 'edit_file') {
+          // Delegate file editing to pi's built-in /edit or similar mechanism
+          ctx.ui.notify('Opening file for editing: ' + this.shortenPath(result.filePath), 'info');
+          // In pi, we can use the edit tool or simply notify the user.
+          // The browser overlay is already closed; the user can use pi's editing capabilities.
+          return;
+        } else if (result.action === 'new_session') {
           await this.createNewSession(result.directory, ctx);
           // After switchSession, ctx is stale — handler returns immediately
         } else if (result.action === 'resume_session') {
