@@ -36,7 +36,8 @@ export interface NavigationResult {
 /** Result returned when the file browser closes */
 export type BrowserResult =
   | { action: 'cancel' }
-  | { action: 'select_directory'; path: string };
+  | { action: 'new_session'; directory: string }
+  | { action: 'resume_session'; directory: string; sessionPath: string };
 
 /** Information about local config files in a directory */
 export interface DirectoryConfigInfo {
@@ -66,12 +67,25 @@ export interface SessionSummary {
   readonly messageCount: number;
 }
 
-/** Options shown when selecting a directory */
+/** Options shown in the selection menu */
 export interface DirectoryOption {
   readonly id: string;
   readonly label: string;
   readonly description: string;
   readonly sessionPath?: string;
   readonly isNewSession?: boolean;
-  readonly isCancel?: boolean;
+  readonly isBack?: boolean;
 }
+
+/** Data for the selection menu, discovered asynchronously */
+export interface SelectionData {
+  readonly directory: string;
+  readonly configDescription: string;
+  readonly options: readonly DirectoryOption[];
+}
+
+/** Async callback to discover options for a directory */
+export type DiscoverOptionsFn = (directory: string) => Promise<SelectionData>;
+
+/** Component mode */
+export type BrowserMode = 'browsing' | 'loading' | 'selecting';
