@@ -1,16 +1,23 @@
 {
   "name": "pi-file-browser",
   "version": "1.0.0",
-  "description": "Total Commander-like TUI file browser for pi",
+  "description": "TUI file browser extension for pi",
   "main": "dist/index.js",
+  "keywords": ["pi-package"],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js"
   },
-  "piExtension": true,
+  "pi": {
+    "extensions": ["./src"]
+  },
   "dependencies": {},
   "devDependencies": {
     "@types/node": "^20.14.0",
     "typescript": "^5.4.5"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
   }
 }

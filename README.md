@@ -7,7 +7,17 @@ A TUI file browser extension for [pi](https://github.com/earendil-works/pi-codin
 
 ## Install
 
-Copy `dist/` and `src/` to `~/.pi/agent/extensions/pi-file-browser/`, then run `/reload` in pi.
+```sh
+pi install /path/to/pi-file-browser
+```
+
+Or from this repo:
+
+```sh
+pi install git:github.com/user/pi-file-browser
+```
+
+After install, run `/reload` in pi.
 
 ## Usage
 
