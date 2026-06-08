@@ -39,58 +39,61 @@ export class FileBrowserApp {
           currentPath = this.fsProvider.getHomeDirectory();
         }
 
-        const panel = new PanelModel(this.fsProvider, currentPath);
-        await panel.refresh();
+        // Loop: browser → edit → browser → ... until cancel, new_session, or resume_session
+        while (true) {
+          const panel = new PanelModel(this.fsProvider, currentPath);
+          await panel.refresh();
 
-        // Single overlay — the component handles browsing, loading, selection, and viewing modes
-        const result = await ctx.ui.custom<BrowserResult>(
-          (tui, _theme, _keybindings, done) => {
-            const component = new FileBrowserComponent(
-              panel,
-              this.inputHandler,
-              tui,
-              done,
-              (directory) => this.discoverOptions(directory),
-              (filePath) => this.fsProvider.readFile(filePath),
-            );
-            return component;
-          },
-          {
-            overlay: true,
-            overlayOptions: {
-              width: '60%',
-              anchor: 'center',
-              margin: { top: 2, bottom: 2 },
+          const result = await ctx.ui.custom<BrowserResult>(
+            (tui, _theme, _keybindings, done) => {
+              const component = new FileBrowserComponent(
+                panel,
+                this.inputHandler,
+                tui,
+                done,
+                (directory) => this.discoverOptions(directory),
+                (filePath) => this.fsProvider.readFile(filePath),
+              );
+              return component;
             },
-          },
-        );
+            {
+              overlay: true,
+              overlayOptions: {
+                width: '60%',
+                anchor: 'center',
+                margin: { top: 2, bottom: 2 },
+              },
+            },
+          );
 
-        // Component closed with a final action — handle it
-        if (result.action === 'edit_file') {
-          // Open pi's built-in multi-line editor with file content
-          try {
-            const content = await this.fsProvider.readFile(result.filePath);
-            const edited = await ctx.ui.editor(
-              'Edit: ' + this.shortenPath(result.filePath),
-              content,
-            );
-            if (edited !== undefined) {
-              // User saved — write back
-              await this.fsProvider.writeFile(result.filePath, edited);
-              ctx.ui.notify('Saved: ' + this.shortenPath(result.filePath), 'info');
+          if (result.action === 'edit_file') {
+            // Open pi's built-in editor, then reopen browser at same directory
+            try {
+              const content = await this.fsProvider.readFile(result.filePath);
+              const edited = await ctx.ui.editor(
+                'Edit: ' + this.shortenPath(result.filePath),
+                content,
+              );
+              if (edited !== undefined) {
+                await this.fsProvider.writeFile(result.filePath, edited);
+                ctx.ui.notify('Saved: ' + this.shortenPath(result.filePath), 'info');
+              }
+            } catch (err) {
+              ctx.ui.notify('Failed to edit file: ' + String(err), 'error');
             }
-          } catch (err) {
-            ctx.ui.notify('Failed to open file: ' + String(err), 'error');
+            // Reopen browser at the same directory
+            continue;
+          } else if (result.action === 'new_session') {
+            await this.createNewSession(result.directory, ctx);
+            return; // ctx is stale after switchSession
+          } else if (result.action === 'resume_session') {
+            await this.resumeSession(result.sessionPath, result.directory, ctx);
+            return; // ctx is stale after switchSession
+          } else {
+            // 'cancel' — exit loop
+            return;
           }
-          return;
-        } else if (result.action === 'new_session') {
-          await this.createNewSession(result.directory, ctx);
-          // After switchSession, ctx is stale — handler returns immediately
-        } else if (result.action === 'resume_session') {
-          await this.resumeSession(result.sessionPath, result.directory, ctx);
-          // After switchSession, ctx is stale — handler returns immediately
         }
-        // 'cancel' — just return
       },
     });
   }
