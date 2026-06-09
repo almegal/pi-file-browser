@@ -2,7 +2,7 @@
 
 A TUI file browser extension for [pi](https://github.com/earendil-works/pi). Navigate directories, open files for editing, and switch workspace sessions — all from within pi.
 
-![demo](https://github.com/user-attachments/assets/d85c538e-0594-4a70-9de0-666294e41d7b)
+![demo](https://github.com/user-attachments/assets/9a1d1c2f-2774-4e97-b38d-c8d9d2135b0d)
 
 ## Install
 
@@ -39,12 +39,21 @@ Start typing to instantly filter the file list. Press `/` to enter search mode e
 
 - Prefix matches appear before substring matches
 - Directories always float to the top
-- `Enter` confirms selection, `Esc` cancels, `Backspace` deletes last char or exits search
+- In search mode, `j`/`k`/`h`/`l` are treated as search characters, not navigation — use arrow keys to move selection
+
+| Key | Action |
+|-----|--------|
+| Printable char | Append to search query |
+| `↑` `↓` | Move selection within results |
+| `→` | Navigate into selected directory |
+| `Enter` | Confirm selection and act on entry |
+| `Esc` / `←` | Cancel search, restore previous position |
+| `Backspace` | Delete last char, or exit search if query is empty |
 
 ### . Toggle hidden files
 
 Press `.` to show or hide dotfiles and dot-directories (`.env`, `.git`, `.pi`, etc.).
-When hidden files are visible, the status bar shows a `[hidden]` marker.
+When hidden files are visible, the status bar shows a `[hidden]` marker. The hints bar shows `.=hidden` when files are hidden and `A=hidden` when they are visible.
 
 ### 🎨 Smart file-type icons
 
@@ -53,20 +62,54 @@ Files and directories get context-aware emoji icons instead of generic 📄/📂
 | Type | Icon | Examples |
 |------|------|----------|
 | TypeScript | 🟦 | `.ts`, `.tsx` |
-| JavaScript | 🟢 | `.js`, `.jsx` |
+| JavaScript | 🟢 | `.js`, `.jsx`, `.vue`, `.svelte` |
 | Python | 🐍 | `.py` |
+| Ruby | 💎 | `.rb` |
 | Go | 🦋 | `.go` |
 | Rust | 🧩 | `.rs` |
-| Config/Data | 📦 | `.json`, `.yaml`, `.toml` |
-| Documentation | 📝 | `.md`, `.rst` |
-| Shell | 💻 | `.sh`, `.bash` |
-| Images | 🖼 | `.png`, `.jpg`, `.svg` |
-| Archives | 🗜 | `.zip`, `.tar`, `.gz` |
-| Special files | 🔨 | `Makefile`, `Dockerfile` |
-| Environment | 🔑 | `.env`, `.env.local` |
-| Git | 🔀 | `.git/` directory |
+| Java | ☕ | `.java` |
+| Kotlin | 💜 | `.kt` |
+| Swift | 🦁 | `.swift` |
+| C / C++ | ⚙️ | `.c`, `.cpp`, `.h` |
+| C# | 💡 | `.cs` |
+| PHP | 🐘 | `.php` |
+| Web / Markup | 🌐 | `.html`, `.htm` |
+| Styles | 🎨 | `.css`, `.scss`, `.less` |
+| Config/Data | 📦 | `.json`, `.yaml`, `.toml`, `.xml` |
+| Data | 📊 | `.csv` |
+| Database | 🗃 | `.sql` |
+| Documentation | 📝 | `.md`, `.mdx`, `.rst`, `.adoc` |
+| Plain text | 📄 | `.txt` |
+| Shell | 💻 | `.sh`, `.bash`, `.zsh`, `.fish` |
+| Lock files | 🔒 | `.lock` |
+| Source maps | 🗺 | `.map` |
+| Images | 🖼 | `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp`, `.ico` |
+| Audio | 🎵 | `.mp3`, `.wav`, `.flac` |
+| Video | 🎬 | `.mp4`, `.mkv`, `.avi`, `.mov` |
+| Archives | 🗜 | `.zip`, `.tar`, `.gz`, `.bz2`, `.7z`, `.rar` |
+| Fonts | 🔡 | `.ttf`, `.otf`, `.woff`, `.woff2` |
+| Binaries | ⚡ | `.exe`, `.dll`, `.so`, `.bin`, `.wasm` |
+| Special files | 🔨 | `Makefile`, `Dockerfile`, `Vagrantfile` |
+| Environment | 🔑 | `.env`, `.env.*` |
+| Ignore files | 🚫 | `.gitignore`, `.dockerignore` |
+| Package config | 📦 | `package.json`, `tsconfig.json` |
+| License | 📜 | `LICENSE`, `LICENSE*` |
+| Readme | 📖 | `README.md`, `README*` |
+| Git | 🔀 | `.git/`, `.github/` |
 | Pi config | 🔮 | `.pi/` directory |
+| Agents config | 🤖 | `.agents/` directory |
+| IDE | 💻 | `.vscode/`, `.idea/` |
 | Tests | ✅ | `test/`, `tests/`, `__tests__/` |
+| Source | 📂 | `src/` |
+| Dist | 📤 | `dist/` |
+| Build | 🔨 | `build/` |
+| Docs | 📚 | `docs/`, `lib/` |
+| Public | 🌐 | `public/` |
+| Assets | 🎨 | `assets/` |
+| Config | ⚙️ | `config/` |
+| Scripts | 💻 | `scripts/` |
+| Vendor | 💰 | `vendor/` |
+| Bin | ⚡ | `bin/` |
 | node_modules | 📦 | `node_modules/` |
 
 60+ extension mappings + special filename and directory detection.
@@ -91,14 +134,32 @@ Switch pi themes and the browser adapts automatically.
 Pressing `Enter` on a directory shows a menu:
 
 - 🆕 **New session** — create a new pi session with that directory as cwd
-- 🔄 **Resume session** — switch to an existing session (shows first message preview)
+- 🔄 **Resume session** — switch to an existing session (shows date, name, message count, and first message preview)
 - ↩ **Back** — return to the browser
 
 Config discovery: the browser detects `AGENTS.md`, `CLAUDE.md`, `.pi/`, `.agents/` in the target directory and shows what's available.
 
+| Key | Action |
+|-----|--------|
+| `↑` `↓` | Select option |
+| `Enter` | Confirm selected option |
+| `Esc` / `←` | Return to browser |
+
 ### ✏️ File editing
 
 Pressing `Enter` on a file closes the browser and opens pi's built-in editor with the file contents. On save, changes are written back. On cancel, the browser reopens at the same directory.
+
+### 🧭 Navigation history
+
+When navigating into a directory with `→`/`l` and then going back with `←`/`h`/`Backspace`, the selection is automatically restored to the directory you came from — no need to scroll back to find your place.
+
+### 📏 Status bar details
+
+The status bar shows the selected entry's type (`DIR` or `FILE`), name, and file size (e.g., `1.2KB`). When hidden files are visible, a `[hidden]` marker appears.
+
+### 📜 Scroll behavior
+
+The entry list scrolls to keep the selected item centered in view, so you never lose context when moving through long directories.
 
 ---
 
