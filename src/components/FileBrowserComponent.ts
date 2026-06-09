@@ -57,7 +57,20 @@ export class FileBrowserComponent implements Component {
 
     // Browsing mode
     const input = this.inputHandler.handleKey(data);
-    if (input === null) return;
+    if (input === null) {
+      // Auto-activate search on printable character (fzf-style)
+      if (data.length === 1) {
+        const code = data.charCodeAt(0);
+        if (code >= 0x20 && code < 0x7f) {
+          this.enterSearch();
+          this.searchQuery = data;
+          this.panel.setSearchQuery(data);
+          this.version++;
+          this.tui.requestRender();
+        }
+      }
+      return;
+    }
 
     if (input === Direction.Up) {
       this.panel.moveUp();
@@ -187,8 +200,10 @@ export class FileBrowserComponent implements Component {
     } else if (input === Direction.Right) {
       const target = this.panel.getSelectedEntry();
       if (target && target.isDirectory) {
-        this.exitSearch(false);
-        this.panel.navigateTo(target.path).then(() => { this.version++; this.tui.requestRender(); });
+        this.searchActive = false;
+        this.searchQuery = '';
+        // goInto handles nav history and clearing search
+        this.panel.goInto().then(() => { this.version++; this.tui.requestRender(); });
       }
       return;
     }
@@ -260,13 +275,13 @@ export class FileBrowserComponent implements Component {
       const status = truncateToWidth(searchLabel + countLabel, w);
       lines.push('\x1b[1m' + status + '\x1b[22m' + ' '.repeat(Math.max(0, w - visibleWidth(status))));
 
-      const hints = truncateToWidth('Enter=confirm  Esc/\u2190=cancel  \u232B=delete', w);
+      const hints = truncateToWidth('Enter=open  \u2191\u2193=navigate  Esc=cancel  \u232B=delete', w);
       lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, w - visibleWidth(hints))) + '\x1b[22m');
     } else {
       const status = truncateToWidth(this.renderStatusBar(), w);
       lines.push('\x1b[1m' + status + '\x1b[22m' + ' '.repeat(Math.max(0, w - visibleWidth(status))));
 
-      const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  /=search  Esc', w);
+      const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  type=filter  Esc', w);
       lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, w - visibleWidth(hints))) + '\x1b[22m');
     }
     return lines;

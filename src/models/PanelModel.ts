@@ -101,13 +101,20 @@ export class PanelModel implements IPanelModel {
       this._entries = [...this._allEntries];
     } else {
       const q = this._searchQuery.toLowerCase();
-      this._entries = this._allEntries.filter(
+      const filtered = this._allEntries.filter(
         (e) => e.name.toLowerCase().includes(q),
       );
+      this._entries = filtered.sort((a, b) => {
+        // Directories first
+        if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+        // Prefix match before substring match
+        const aPrefix = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+        const bPrefix = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+        if (aPrefix !== bPrefix) return aPrefix - bPrefix;
+        // Alphabetical within group
+        return a.name.localeCompare(b.name);
+      });
     }
-    this._selectedIndex = Math.min(
-      this._selectedIndex,
-      Math.max(0, this._entries.length - 1),
-    );
+    this._selectedIndex = 0;
   }
 }
