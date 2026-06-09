@@ -2,9 +2,11 @@
 
 import type { Component } from '@earendil-works/pi-tui';
 import { truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
+import type { Theme } from '@earendil-works/pi-coding-agent';
 import { IPanelModel } from '../interfaces/IPanelModel';
 import { IInputHandler } from '../interfaces/IInputHandler';
 import { Direction, Action, BrowserResult, BrowserMode, SelectionData, DiscoverOptionsFn, FileEntry } from '../types';
+import { FileTypeIconProvider } from '../services/FileTypeIconProvider';
 
 const TL = '\u256D', TR = '\u256E', BL = '\u2570', BR = '\u256F', H = '\u2500', V = '\u2502';
 
@@ -22,16 +24,20 @@ export class FileBrowserComponent implements Component {
   private searchQuery: string = '';
   private preSearchIndex: number = 0;
 
+  private readonly iconProvider = new FileTypeIconProvider();
   private readonly done: (result: BrowserResult) => void;
   private readonly discoverOptions: DiscoverOptionsFn;
+  private readonly theme: Theme;
 
   constructor(
     private readonly panel: IPanelModel,
     private readonly inputHandler: IInputHandler,
     private readonly tui: { requestRender: () => void },
+    theme: Theme,
     done: (result: BrowserResult) => void,
     discoverOptions: DiscoverOptionsFn,
   ) {
+    this.theme = theme;
     this.done = done;
     this.discoverOptions = discoverOptions;
   }
@@ -91,6 +97,9 @@ export class FileBrowserComponent implements Component {
       return;
     } else if (input === Action.Search) {
       this.enterSearch();
+    } else if (input === Action.ToggleHidden) {
+      this.panel.toggleHidden().then(() => { this.version++; this.tui.requestRender(); });
+      return;
     } else if (input === Action.Backspace) {
       // In browsing mode, backspace navigates up (same as left/h)
       this.panel.goUp().then(() => { this.version++; this.tui.requestRender(); });
@@ -259,7 +268,7 @@ export class FileBrowserComponent implements Component {
 
   private renderBrowsing(w: number): string[] {
     const lines: string[] = [];
-    lines.push('\u2500'.repeat(w));
+    lines.push(this.theme.fg('border', '\u2500'.repeat(w)));
 
     const max = 16;
     const entries = this.renderPanelEntries(this.panel.entries, this.panel.selectedIndex, w, max);
@@ -273,26 +282,27 @@ export class FileBrowserComponent implements Component {
         ? ''
         : ' (' + matchCount + '/' + totalCount + ')';
       const status = truncateToWidth(searchLabel + countLabel, w);
-      lines.push('\x1b[1m' + status + '\x1b[22m' + ' '.repeat(Math.max(0, w - visibleWidth(status))));
+      lines.push(this.theme.fg('accent', status) + ' '.repeat(Math.max(0, w - visibleWidth(status))));
 
-      const hints = truncateToWidth('Enter=open  \u2191\u2193=navigate  Esc=cancel  \u232B=delete', w);
-      lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, w - visibleWidth(hints))) + '\x1b[22m');
+      const hints = truncateToWidth('Enter=confirm  Esc/\u2190=cancel  \u232B=delete', w);
+      lines.push(this.theme.fg('dim', hints) + ' '.repeat(Math.max(0, w - visibleWidth(hints))));
     } else {
       const status = truncateToWidth(this.renderStatusBar(), w);
-      lines.push('\x1b[1m' + status + '\x1b[22m' + ' '.repeat(Math.max(0, w - visibleWidth(status))));
+      lines.push(this.theme.fg('accent', status) + ' '.repeat(Math.max(0, w - visibleWidth(status))));
 
-      const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  type=filter  Esc', w);
-      lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, w - visibleWidth(hints))) + '\x1b[22m');
+      const hiddenLabel = this.panel.showHidden ? 'A' : '.';
+      const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  /=search  ' + hiddenLabel + '=hidden  Esc', w);
+      lines.push(this.theme.fg('dim', hints) + ' '.repeat(Math.max(0, w - visibleWidth(hints))));
     }
     return lines;
   }
 
   private renderLoading(w: number): string[] {
     const lines: string[] = [];
-    lines.push('\u2500'.repeat(w));
+    lines.push(this.theme.fg('border', '\u2500'.repeat(w)));
     const msg = '\u23F3 Discovering sessions...';
     const padded = ' '.repeat(Math.max(0, Math.floor((w - visibleWidth(msg)) / 2))) + truncateToWidth(msg, w);
-    lines.push(padded + ' '.repeat(Math.max(0, w - visibleWidth(padded))));
+    lines.push(this.theme.fg('muted', padded) + ' '.repeat(Math.max(0, w - visibleWidth(padded))));
     for (let i = 1; i < 18; i++) lines.push(' '.repeat(w));
     return lines;
   }
@@ -303,8 +313,8 @@ export class FileBrowserComponent implements Component {
 
     const lines: string[] = [];
     const configLine = truncateToWidth(data.configDescription, w);
-    lines.push('\x1b[2m' + configLine + ' '.repeat(Math.max(0, w - visibleWidth(configLine))) + '\x1b[22m');
-    lines.push('\u2500'.repeat(w));
+    lines.push(this.theme.fg('dim', configLine) + ' '.repeat(Math.max(0, w - visibleWidth(configLine))));
+    lines.push(this.theme.fg('border', '\u2500'.repeat(w)));
 
     const maxRows = 14;
     for (let i = 0; i < maxRows; i++) {
@@ -313,15 +323,15 @@ export class FileBrowserComponent implements Component {
       const isSelected = i === this.selectionIndex;
       let text = truncateToWidth(' ' + option.label, w);
       text += ' '.repeat(Math.max(0, w - visibleWidth(text)));
-      if (isSelected) text = '\x1b[7m' + text + '\x1b[27m';
+      if (isSelected) text = this.theme.bg('selectedBg', text);
       lines.push(text);
     }
 
-    const status = truncateToWidth('\x1b[1mSelect action\x1b[22m', w);
-    lines.push(status + ' '.repeat(Math.max(0, w - visibleWidth(status))));
+    const statusText = truncateToWidth('Select action', w);
+    lines.push(this.theme.fg('accent', statusText) + ' '.repeat(Math.max(0, w - visibleWidth(statusText))));
 
     const hints = truncateToWidth('\u21B5=confirm  \u2191\u2193=select  Esc/\u2190=back', w);
-    lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, w - visibleWidth(hints))) + '\x1b[22m');
+    lines.push(this.theme.fg('dim', hints) + ' '.repeat(Math.max(0, w - visibleWidth(hints))));
     return lines;
   }
 
@@ -332,9 +342,13 @@ export class FileBrowserComponent implements Component {
       : ' ' + this.panel.currentPath + ' ';
     const header = truncateToWidth(pathLabel, innerWidth);
     const pad = innerWidth - visibleWidth(header);
-    result.push(TL + H + '\x1b[1m' + header + ' '.repeat(pad) + '\x1b[22m' + H + TR);
-    for (const line of innerLines) result.push(V + line + V);
-    result.push(BL + H.repeat(innerWidth) + BR);
+    result.push(
+      this.theme.fg('borderAccent', TL + H) +
+      this.theme.fg('accent', header + ' '.repeat(pad)) +
+      this.theme.fg('borderAccent', H + TR),
+    );
+    for (const line of innerLines) result.push(this.theme.fg('border', V) + line + this.theme.fg('border', V));
+    result.push(this.theme.fg('border', BL + H.repeat(innerWidth) + BR));
     return result;
   }
 
@@ -347,12 +361,12 @@ export class FileBrowserComponent implements Component {
       const idx = i + offset;
       if (idx >= entries.length) { lines.push(' '.repeat(w)); continue; }
       const entry = entries[idx];
-      const icon = entry.isDirectory ? '\u{1F4C1}' : '\u{1F4C4}';
+      const icon = this.iconProvider.getIcon(entry);
       const suffix = entry.isDirectory ? '/' : '';
       let text = truncateToWidth(' ' + icon + ' ' + entry.name + suffix, w);
       text += ' '.repeat(Math.max(0, w - visibleWidth(text)));
-      if (idx === selectedIndex) text = '\x1b[7m' + text + '\x1b[27m';
-      else if (entry.isDirectory) text = '\x1b[1m' + text + '\x1b[22m';
+      if (idx === selectedIndex) text = this.theme.bg('selectedBg', text);
+      else if (entry.isDirectory) text = this.theme.fg('accent', text);
       lines.push(text);
     }
     return lines;
@@ -372,7 +386,8 @@ export class FileBrowserComponent implements Component {
       const size = s.isDirectory ? '' : ' ' + formatSize(s.size);
       info = type + ' ' + s.name + size;
     }
-    return ' \x1b[1m' + info + '\x1b[22m';
+    const hiddenMarker = this.panel.showHidden ? ' ' + this.theme.fg('dim', '[hidden]') : '';
+    return ' ' + info + hiddenMarker;
   }
 }
 

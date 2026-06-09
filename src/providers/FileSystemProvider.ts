@@ -5,14 +5,15 @@ import { IFileSystemProvider } from '../interfaces/IFileSystemProvider';
 import { FileEntry } from '../types';
 
 export class FileSystemProvider implements IFileSystemProvider {
-  async listDirectory(dirPath: string): Promise<FileEntry[]> {
+  async listDirectory(dirPath: string, options?: { showHidden?: boolean }): Promise<FileEntry[]> {
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    const showHidden = options?.showHidden ?? false;
 
     const dirs: FileEntry[] = [];
     const files: FileEntry[] = [];
 
     for (const entry of entries) {
-      if (entry.name.startsWith('.')) continue;
+      if (!showHidden && entry.name.startsWith('.')) continue;
 
       const fullPath = path.join(dirPath, entry.name);
       try {

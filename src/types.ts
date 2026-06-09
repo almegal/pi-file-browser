@@ -19,6 +19,7 @@ export enum Action {
   Tab = 'TAB',
   Search = 'SEARCH',
   Backspace = 'BACKSPACE',
+  ToggleHidden = 'TOGGLE_HIDDEN',
 }
 
 export interface NavigationResult {
