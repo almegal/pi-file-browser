@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionCommandContext } from '@earendil-works/pi-coding-agent';
+import type { ExtensionAPI, ExtensionCommandContext, Theme } from '@earendil-works/pi-coding-agent';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
 import type { SessionInfo } from '@earendil-works/pi-coding-agent';
 import { IFileSystemProvider } from '../interfaces/IFileSystemProvider';
@@ -37,9 +37,9 @@ export class FileBrowserApp {
           await panel.refresh();
 
           const result = await ctx.ui.custom<BrowserResult>(
-            (tui, _theme, _keybindings, done) => {
+            (tui, theme: Theme, _keybindings, done) => {
               return new FileBrowserComponent(
-                panel, this.inputHandler, tui, done,
+                panel, this.inputHandler, tui, theme, done,
                 (directory) => this.discoverOptions(directory),
               );
             },
