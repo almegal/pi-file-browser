@@ -5,6 +5,7 @@ import { truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
 import { IPanelModel } from '../interfaces/IPanelModel';
 import { IInputHandler } from '../interfaces/IInputHandler';
 import { Direction, Action, BrowserResult, BrowserMode, SelectionData, DiscoverOptionsFn, FileEntry } from '../types';
+import { FileTypeIconProvider } from '../services/FileTypeIconProvider';
 
 const TL = '\u256D', TR = '\u256E', BL = '\u2570', BR = '\u256F', H = '\u2500', V = '\u2502';
 
@@ -22,6 +23,7 @@ export class FileBrowserComponent implements Component {
   private searchQuery: string = '';
   private preSearchIndex: number = 0;
 
+  private readonly iconProvider = new FileTypeIconProvider();
   private readonly done: (result: BrowserResult) => void;
   private readonly discoverOptions: DiscoverOptionsFn;
 
@@ -91,6 +93,9 @@ export class FileBrowserComponent implements Component {
       return;
     } else if (input === Action.Search) {
       this.enterSearch();
+    } else if (input === Action.ToggleHidden) {
+      this.panel.toggleHidden().then(() => { this.version++; this.tui.requestRender(); });
+      return;
     } else if (input === Action.Backspace) {
       // In browsing mode, backspace navigates up (same as left/h)
       this.panel.goUp().then(() => { this.version++; this.tui.requestRender(); });
@@ -281,7 +286,8 @@ export class FileBrowserComponent implements Component {
       const status = truncateToWidth(this.renderStatusBar(), w);
       lines.push('\x1b[1m' + status + '\x1b[22m' + ' '.repeat(Math.max(0, w - visibleWidth(status))));
 
-      const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  type=filter  Esc', w);
+      const hiddenLabel = this.panel.showHidden ? 'A' : '.';
+      const hints = truncateToWidth('\u21B5=open  \u2192=browse  \u2191\u2193\u2190  /=search  ' + hiddenLabel + '=hidden  Esc', w);
       lines.push('\x1b[2m' + hints + ' '.repeat(Math.max(0, w - visibleWidth(hints))) + '\x1b[22m');
     }
     return lines;
@@ -347,7 +353,7 @@ export class FileBrowserComponent implements Component {
       const idx = i + offset;
       if (idx >= entries.length) { lines.push(' '.repeat(w)); continue; }
       const entry = entries[idx];
-      const icon = entry.isDirectory ? '\u{1F4C1}' : '\u{1F4C4}';
+      const icon = this.iconProvider.getIcon(entry);
       const suffix = entry.isDirectory ? '/' : '';
       let text = truncateToWidth(' ' + icon + ' ' + entry.name + suffix, w);
       text += ' '.repeat(Math.max(0, w - visibleWidth(text)));
@@ -372,7 +378,8 @@ export class FileBrowserComponent implements Component {
       const size = s.isDirectory ? '' : ' ' + formatSize(s.size);
       info = type + ' ' + s.name + size;
     }
-    return ' \x1b[1m' + info + '\x1b[22m';
+    const hiddenMarker = this.panel.showHidden ? ' \x1b[2m[hidden]\x1b[22m' : '';
+    return ' \x1b[1m' + info + '\x1b[22m' + hiddenMarker;
   }
 }
 

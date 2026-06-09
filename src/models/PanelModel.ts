@@ -10,6 +10,7 @@ export class PanelModel implements IPanelModel {
   private _allEntries: FileEntry[] = [];
   private _entries: FileEntry[] = [];
   private _searchQuery: string = '';
+  private _showHidden: boolean = false;
   private _navHistory: string[] = []; // stack of entered directory names
 
   constructor(
@@ -24,6 +25,7 @@ export class PanelModel implements IPanelModel {
   get entries(): ReadonlyArray<FileEntry> { return this._entries; }
   get searchQuery(): string { return this._searchQuery; }
   get totalEntries(): number { return this._allEntries.length; }
+  get showHidden(): boolean { return this._showHidden; }
 
   getSelectedEntry(): FileEntry | undefined {
     if (this._entries.length === 0) return undefined;
@@ -36,7 +38,7 @@ export class PanelModel implements IPanelModel {
       throw new Error(`Not a directory: ${path}`);
     }
     this._currentPath = path;
-    this._allEntries = await this.fsProvider.listDirectory(path);
+    this._allEntries = await this.fsProvider.listDirectory(path, { showHidden: this._showHidden });
     this._applyFilter();
   }
 
@@ -82,8 +84,13 @@ export class PanelModel implements IPanelModel {
   }
 
   async refresh(): Promise<void> {
-    this._allEntries = await this.fsProvider.listDirectory(this._currentPath);
+    this._allEntries = await this.fsProvider.listDirectory(this._currentPath, { showHidden: this._showHidden });
     this._applyFilter();
+  }
+
+  async toggleHidden(): Promise<void> {
+    this._showHidden = !this._showHidden;
+    await this.refresh();
   }
 
   setSearchQuery(query: string): void {

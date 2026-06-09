@@ -26,6 +26,7 @@ export class NavigationInputHandler implements IInputHandler {
       { match: (d) => matchesKey(d, Key.tab), result: Action.Tab },
       { match: (d) => d === '/', result: Action.Search },
       { match: (d) => d === '\x7f' || d === '\x08', result: Action.Backspace },
+      { match: (d) => d === '.', result: Action.ToggleHidden },
     ];
   }
 

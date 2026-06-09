@@ -6,6 +6,7 @@ export interface IPanelModel {
   readonly entries: ReadonlyArray<FileEntry>;
   readonly searchQuery: string;
   readonly totalEntries: number;
+  readonly showHidden: boolean;
 
   getSelectedEntry(): FileEntry | undefined;
   navigateTo(path: string): Promise<void>;
@@ -17,4 +18,5 @@ export interface IPanelModel {
   refresh(): Promise<void>;
   setSearchQuery(query: string): void;
   clearSearch(): void;
+  toggleHidden(): Promise<void>;
 }
