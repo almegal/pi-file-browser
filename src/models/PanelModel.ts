@@ -10,6 +10,7 @@ export class PanelModel implements IPanelModel {
   private _allEntries: FileEntry[] = [];
   private _entries: FileEntry[] = [];
   private _searchQuery: string = '';
+  private _navHistory: string[] = []; // stack of entered directory names
 
   constructor(
     private readonly fsProvider: IFileSystemProvider,
@@ -55,7 +56,15 @@ export class PanelModel implements IPanelModel {
   async goUp(): Promise<void> {
     const parentPath = this.fsProvider.getParentPath(this._currentPath);
     if (parentPath !== this._currentPath) {
+      const childName = this._navHistory.length > 0
+        ? this._navHistory.pop()!
+        : this.fsProvider.getBaseName(this._currentPath);
       await this.navigateTo(parentPath);
+      // Restore selection to the directory we came from
+      const idx = this._entries.findIndex((e) => e.name === childName);
+      if (idx >= 0) {
+        this._selectedIndex = idx;
+      }
     }
   }
 
@@ -64,6 +73,7 @@ export class PanelModel implements IPanelModel {
     const selected = this._entries[this._selectedIndex];
     if (!selected) return false;
     if (selected.isDirectory) {
+      this._navHistory.push(selected.name);
       this._searchQuery = '';
       await this.navigateTo(selected.path);
       return true;

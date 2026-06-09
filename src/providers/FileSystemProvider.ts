@@ -66,6 +66,10 @@ export class FileSystemProvider implements IFileSystemProvider {
     return parent === dirPath ? dirPath : parent;
   }
 
+  getBaseName(pathStr: string): string {
+    return path.basename(pathStr);
+  }
+
   joinPath(...segments: string[]): string { return path.join(...segments); }
   getHomeDirectory(): string { return os.homedir(); }
 

@@ -1,6 +1,6 @@
 {
   "name": "@almegal/pi-file-browser",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "TUI file browser extension for pi",
   "main": "dist/index.js",
   "files": [
@@ -11,6 +11,7 @@
   "keywords": ["pi-package"],
   "scripts": {
     "build": "tsc",
+    "test": "npm run build",
     "prepublishOnly": "npm run build"
   },
   "pi": {
@@ -18,11 +19,9 @@
   },
   "dependencies": {},
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.79.0",
+    "@earendil-works/pi-tui": "^0.79.0",
     "@types/node": "^20.14.0",
     "typescript": "^5.4.5"
-  },
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
   }
 }
