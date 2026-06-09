@@ -1,6 +1,6 @@
 # pi-file-browser
 
-A TUI file browser extension for [pi](https://github.com/earendil-works/pi-coding-agent). Navigate directories, open files for editing, and switch workspace sessions — all from within pi.
+A TUI file browser extension for [pi](https://github.com/earendil-works/pi). Navigate directories, open files for editing, and switch workspace sessions — all from within pi.
 
 ![demo](https://github.com/user-attachments/assets/d85c538e-0594-4a70-9de0-666294e41d7b)
 
